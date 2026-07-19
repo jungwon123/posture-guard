@@ -282,6 +282,7 @@ async function start() {
 // 카메라 끄기 — 웹캠 트랙을 정지해 카메라 불이 꺼지고 감지가 멈춘다.
 function stop() {
   running = false;
+  window.__pgLive = { running: false }; // 도우미에게 카메라 꺼짐 알림
   const s = els.cam.srcObject;
   if (s) { s.getTracks().forEach((t) => t.stop()); els.cam.srcObject = null; }
   blinkSampling = false;
@@ -433,6 +434,11 @@ function tick() {
     const dur = sm.stateSince ? now - sm.stateSince : 0;
     const badCand = sm.cand?.[0] === "BAD";
     const face = rewards.fairy(state, dur, badCand);
+
+    // 라이브 자세 노출 — 돌아다니는 요정 도우미(Buddy)가 읽어 문제 부위를 말풍선으로 콕 짚어줌
+    let worst = null, worstZ = TUNING.DEADZONE_Z;
+    for (const k in zs) if (zs[k] > worstZ) { worstZ = zs[k]; worst = k; }
+    window.__pgLive = { running: true, state, score, worst, dur, ts: now };
 
     if (state !== prev) {
       logTransition(prev, state, now);

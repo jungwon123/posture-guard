@@ -14,6 +14,7 @@ import LoginPage from "./components/LoginPage.jsx";
 import ReportOverlay from "./components/ReportOverlay.jsx";
 import InstallBanner from "./components/InstallBanner.jsx";
 import BottomNav from "./components/BottomNav.jsx";
+import Buddy from "./components/Buddy.jsx";
 import { initApp } from "./app.js";
 
 // 페이지 5개는 전부 마운트한 채 표시만 전환한다 — 어느 탭에 있든 카메라 감지가 계속
@@ -56,6 +57,7 @@ export default function App() {
 
       <ReportOverlay />
       <InstallBanner />
+      <Buddy />
       <BottomNav page={page} onChange={setPage} />
     </>
   );
