@@ -4,6 +4,8 @@ import {
   TUNING, SIGNAL_KEYS, LM, extractSignals, SignalSmoother, Judge,
   StateMachine, finishCalibration, replay,
 } from "./core.js";
+// 3D 절대 지표 레이어 — 개인 z-score 위에 "거리에 강한 + 절대 바른자세" 게이트를 얹는다(core 무수정).
+import { AbsSmoother, extractAbsolute, finishAbsRef, absPenalty, absWorst } from "./posture3d.js";
 import { Rewards, MELODIES, SKINS, THEMES, SHOP, TIERS, computeReport } from "./reward.js";
 
 // React 마운트 후 1회 실행 (엔진 계층 — 카메라 루프·판정·알림·PiP)
@@ -89,6 +91,9 @@ let sm = new StateMachine();
 let running = false;
 let bgTickSet = false;
 let calibUntil = null, calibSamples = [];
+let absSmoother = new AbsSmoother(); // 3D 지표 One-Euro
+let absRef = null;                   // 유도 캘리브로 잡은 "바른 자세" 절대 기준
+let absCalibSamples = [];            // 캘리브 중 절대 지표 수집
 let escFired = false;
 let lastDetect = 0;
 let lastResult = null;
@@ -108,7 +113,7 @@ let nextBlinkAt = 0;            // 다음 측정 예정 시각(초)
 let blinkRate = null;          // 마지막 추정 분당 횟수
 
 const profile = store.loadProfile();
-if (profile) { judge = new Judge(profile); sm.state = "GOOD"; }
+if (profile) { judge = new Judge(profile); sm.state = "GOOD"; absRef = profile.absRef || null; }
 
 // ── 알림 (소리·진동·노래는 reward.js 설정을 따름) ──
 // 화면 안 배너 — 아이폰(WebKit)처럼 Notification 미지원/미허용일 때의 대체 채널
@@ -392,7 +397,7 @@ function tick() {
   const minGap = document.hidden ? 950 : 100; // 보일 때 10Hz, 숨김 1Hz
   if (wallMs - lastDetect >= minGap && els.cam.readyState >= 2) {
     lastDetect = wallMs;
-    let sig = null;
+    let sig = null, absM = null;
     try {
       lastResult = landmarker.detectForVideo(els.cam, wallMs);
       const lms = lastResult.landmarks?.[0];
@@ -400,6 +405,8 @@ function tick() {
         const raw = extractSignals(lms);
         if (raw) sig = smoother.update(raw);
       }
+      // 3D 절대 지표(미터 world 좌표) — 추가 추론비용 0, 없으면 null
+      absM = absSmoother.update(extractAbsolute(lastResult.worldLandmarks?.[0]), now);
     } catch {}
 
     processBlink(now, wallMs); // 눈 깜빡임 주기 샘플링 (켜져 있을 때만)
@@ -407,14 +414,19 @@ function tick() {
     // 캘리브레이션 수집
     if (calibUntil !== null) {
       if (sig) calibSamples.push(sig);
+      if (absM) absCalibSamples.push(absM);
       const remain = calibUntil - now;
-      els.msg.textContent = `기준 등록 중… ${Math.max(0, remain).toFixed(1)}s — 바르게 앉아 계세요`;
+      els.msg.textContent = `바른자세 기준 등록 중… ${Math.max(0, remain).toFixed(1)}s — 귀·어깨 일직선, 화면은 눈높이, 등 펴기`;
       if (remain <= 0) {
         if (calibSamples.length >= 5) {
           const p = finishCalibration(calibSamples);
+          const ref = finishAbsRef(absCalibSamples); // 이 "바른 자세"의 3D 절대 기준
+          if (ref) p.absRef = ref;
           store.saveProfile(p);
+          absRef = ref;
           judge = new Judge(p);
           smoother = new SignalSmoother();
+          absSmoother = new AbsSmoother();
           sm = new StateMachine(); sm.state = "GOOD";
           logTransition(null, "GOOD", now);
           els.msg.textContent = "기준 등록 완료. 척추요정이 깨어났어요!";
@@ -423,12 +435,16 @@ function tick() {
           els.msg.textContent = "몸이 잘 안 잡혔어요. 다시 [기준 등록]을 눌러주세요.";
         }
         calibUntil = null;
+        absCalibSamples = [];
       }
     }
 
-    // 판정 + 상태 전이
+    // 판정 + 상태 전이 — 개인 z-score(core)에 3D 절대 게이트를 곱해 결합
     let score = null, zs = {};
-    if (judge && sig && calibUntil === null) [score, zs] = judge.score(sig);
+    if (judge && sig && calibUntil === null) {
+      [score, zs] = judge.score(sig);
+      if (absRef && absM) score *= Math.exp(-absPenalty(absM, absRef)); // 절대적으로 나쁘면 추가 감점
+    }
     const prev = sm.state;
     const state = sm.update(judge ? score : null, now);
     const dur = sm.stateSince ? now - sm.stateSince : 0;
@@ -438,6 +454,7 @@ function tick() {
     // 라이브 자세 노출 — 돌아다니는 요정 도우미(Buddy)가 읽어 문제 부위를 말풍선으로 콕 짚어줌
     let worst = null, worstZ = TUNING.DEADZONE_Z;
     for (const k in zs) if (zs[k] > worstZ) { worstZ = zs[k]; worst = k; }
+    if (!worst && absRef && absM) worst = absWorst(absM, absRef); // 2D가 못 짚으면 3D 절대 지표로
     window.__pgLive = { running: true, state, score, worst, dur, ts: now };
 
     if (state !== prev) {
@@ -1105,7 +1122,11 @@ els.replayInput.onchange = async () => {
 
 // ── 버튼 ──
 els.btnStart.onclick = () => { if (running) stop(); else start(); };
-els.btnCalib.onclick = () => { calibUntil = nowSec() + TUNING.CALIB_SECS; calibSamples = []; };
+els.btnCalib.onclick = () => {
+  calibUntil = nowSec() + TUNING.CALIB_SECS;
+  calibSamples = []; absCalibSamples = []; absSmoother = new AbsSmoother();
+  speak("바르게! 귀·어깨 일직선, 화면 눈높이 🧘");
+};
 els.btnNotify.onclick = async () => {
   playNotes(MELODIES.sparkle.notes, rewards.settings.volume); // 사용자 제스처로 오디오 잠금 해제 (아이폰 필수 — 가장 먼저)
   if (typeof Notification === "undefined") {
