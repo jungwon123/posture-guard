@@ -6,12 +6,12 @@
       "started_at": "2026-07-19T22:06:08.628Z",
       "parent_mode": "none",
       "status": "completed",
-      "completed_at": "2026-07-19T22:06:32.668Z",
-      "duration_ms": 24040
+      "completed_at": "2026-07-19T22:06:56.024Z",
+      "duration_ms": 47396
     }
   ],
   "total_spawned": 1,
-  "total_completed": 1,
+  "total_completed": 9,
   "total_failed": 0,
-  "last_updated": "2026-07-19T22:06:32.772Z"
+  "last_updated": "2026-07-19T22:06:56.127Z"
 }

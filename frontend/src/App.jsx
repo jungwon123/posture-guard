@@ -7,7 +7,7 @@ import PostureChart from "./components/PostureChart.jsx";
 import SettingsPanel from "./components/SettingsPanel.jsx";
 import EyeCarePanel from "./components/EyeCarePanel.jsx";
 import GroupPanel from "./components/GroupPanel.jsx";
-import RealtimeCamera from "./components/RealtimeCamera.jsx";
+import GroupGrid from "./components/GroupGrid.jsx";
 import ShopPage from "./components/ShopPage.jsx";
 import CharacterPage from "./components/CharacterPage.jsx";
 import LoginPage from "./components/LoginPage.jsx";
@@ -39,7 +39,7 @@ export default function App() {
 
       <div className="page" style={show("group")}>
         <GroupPanel />
-        <RealtimeCamera />
+        <GroupGrid />
       </div>
 
       <div className="page" style={show("shop")}>

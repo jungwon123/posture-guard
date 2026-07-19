@@ -6,6 +6,7 @@ import rateLimit from "express-rate-limit";
 import pg from "pg";
 import http from "http";
 import { attachSignaling } from "./signaling.js";
+import { AccessToken } from "livekit-server-sdk";
 
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 10 });
 
@@ -207,7 +208,27 @@ app.get("/api/leaderboard", async (req, res) => {
   return res.json({ rows, champions });
 });
 
+// LiveKit(반전체 그리드) 참가 토큰 — 같은 그룹 멤버만. 키 미설정 시 503으로 대기.
+app.post("/api/rtc-token", async (req, res) => {
+  const memberId = (req.body?.memberId || "").trim();
+  const code = (req.body?.code || "").trim().toUpperCase();
+  if (!isUuid(memberId)) return bad(res, 400, "잘못된 기기 ID");
+  if (!/^[A-Z2-9]{6}$/.test(code)) return bad(res, 400, "코드는 6자리예요");
+  const { LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET } = process.env;
+  if (!LIVEKIT_URL || !LIVEKIT_API_KEY || !LIVEKIT_API_SECRET)
+    return res.status(503).json({ error: "LiveKit 미설정 (관리자 키 필요)", configured: false });
+  const q = await pool.query(
+    "SELECT m.nickname FROM members m JOIN groups g ON g.id = m.group_id WHERE m.id = $1 AND g.code = $2",
+    [memberId, code]);
+  if (!q.rows.length) return bad(res, 404, "그룹 멤버만 가능해요");
+  const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET,
+    { identity: memberId, name: q.rows[0].nickname, ttl: "2h" });
+  at.addGrant({ roomJoin: true, room: `pg-${code}`, canPublish: true, canSubscribe: true });
+  const token = await at.toJwt(); // v2: async
+  return res.json({ token, url: LIVEKIT_URL, room: `pg-${code}`, configured: true });
+});
+
 const server = http.createServer(app);
-attachSignaling(server, pool); // WebRTC 시그널링 /ws (영상은 P2P, 서버는 중개만)
+attachSignaling(server, pool); // (기존 mesh) WebRTC 시그널링 /ws
 const port = process.env.PORT || 8080;
 server.listen(port, "127.0.0.1", () => console.log(`posture-guard-api (pg) on :${port}`));
