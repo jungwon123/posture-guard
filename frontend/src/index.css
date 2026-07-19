@@ -232,10 +232,49 @@
 /* 상점 · 캐릭터 */
 .points-card { text-align: center; }
 .points-big { font-size: 30px; font-weight: 800; color: var(--accent); margin: 4px 0; }
-.char-card { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 6px; }
-.char-preview { width: 128px; height: 128px; image-rendering: pixelated; }
+/* 캐릭터 카드 = 요정 프레임(테두리 에셋) + 스포트라이트 */
+.char-card { position: relative; border: none; border-radius: 16px; padding: 20px 16px 16px;
+  text-align: center; display: flex; flex-direction: column; align-items: center; gap: 6px;
+  background:
+    url("/assets/ui/tier-epic.png") center / 100% 100% no-repeat,
+    radial-gradient(66% 52% at 50% 44%, rgba(184,150,238,.20), transparent 62%),
+    linear-gradient(180deg, rgba(34,40,52,.58), rgba(18,22,30,.82)); }
+:root[data-theme="light"] .char-card { background:
+    url("/assets/ui/tier-epic.png") center / 100% 100% no-repeat,
+    radial-gradient(66% 52% at 50% 44%, rgba(184,150,238,.16), transparent 62%),
+    linear-gradient(180deg, rgba(255,255,255,.74), rgba(246,241,251,.9)); }
+.char-preview { width: 128px; height: 128px; image-rendering: pixelated; filter: drop-shadow(0 4px 8px rgba(0,0,0,.3)); }
 .char-preview-emoji { font-size: 84px; line-height: 1.2; }
 .login-card form .row input { min-width: 0; }
+
+/* 캐릭터 페이지 보유 목록 그리드 (상점 카드처럼 눌러서 장착) */
+.equip-grid { margin-top: 4px; }
+.equip-sec-t { font-size: 12.5px; font-weight: 800; color: var(--dim); margin: 10px 2px 6px; }
+.equip-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+@media (min-width: 520px) { .equip-cards { grid-template-columns: repeat(4, 1fr); } }
+.equip-card { position: relative; border: none; border-radius: 13px; cursor: pointer;
+  padding: 13px 8px 11px; display: flex; flex-direction: column; align-items: center; gap: 5px;
+  background:
+    url("/assets/ui/card-frame.png") center / 100% 100% no-repeat,
+    radial-gradient(120% 78% at 50% 30%, rgba(150,160,190,.14), transparent 62%),
+    linear-gradient(180deg, rgba(34,40,52,.55), rgba(18,22,30,.75));
+  transition: transform .12s; }
+:root[data-theme="light"] .equip-card { background:
+    url("/assets/ui/card-frame.png") center / 100% 100% no-repeat,
+    radial-gradient(120% 78% at 50% 30%, rgba(150,160,190,.14), transparent 62%),
+    linear-gradient(180deg, rgba(255,255,255,.72), rgba(246,241,251,.88)); }
+.equip-card:active { transform: scale(.96); }
+.equip-card.on { box-shadow: 0 0 0 2px var(--accent), 0 0 15px color-mix(in srgb, var(--accent) 55%, transparent); }
+.equip-thumb { width: 54px; height: 54px; object-fit: contain; image-rendering: pixelated;
+  filter: drop-shadow(0 2px 3px rgba(0,0,0,.3)); }
+.equip-thumb.emoji { font-size: 40px; line-height: 54px; }
+.equip-name { font-size: 11.5px; font-weight: 700; text-align: center; line-height: 1.15; word-break: keep-all; }
+.equip-badge { font-size: 10px; font-weight: 800; color: #101418; background: var(--accent); padding: 1px 8px; border-radius: 999px; }
+.equip-themes { display: flex; flex-wrap: wrap; gap: 8px; }
+.equip-theme { display: inline-flex; align-items: center; gap: 7px; cursor: pointer; color: var(--text);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 999px; padding: 5px 13px 5px 6px; font-size: 12.5px; font-weight: 700; }
+.equip-theme.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.equip-sw { width: 18px; height: 18px; border-radius: 50%; border: 2px solid #ffffff40; flex: none; }
 
 /* ── 차트/기록 (Recharts) v3.1 · 폰·태블릿 기준 ── */
 .chart-card { padding-top: 12px; }

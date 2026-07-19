@@ -27,7 +27,6 @@ const els = {
   setVibrate: $("set-vibrate"), setCustom: $("set-custom"),
   btnSong: $("btn-song"), songFile: $("song-file"), songName: $("song-name"),
   btnTest: $("btn-test"), shopList: $("shop-list"),
-  applySkin: $("apply-skin"), applyTheme: $("apply-theme"),
   blink: $("blink"), setBlink: $("set-blink"), blinkStatus: $("blink-status"),
 };
 
@@ -844,13 +843,33 @@ function renderShop() {
     sec.appendChild(grid);
     els.shopList.appendChild(sec);
   }
-  // 적용 셀렉트
-  els.applySkin.innerHTML = "";
-  for (const k of rewards.ownedOf("skin")) els.applySkin.add(new Option(SKINS[k].label, k));
-  els.applySkin.value = rewards.shop.skin;
-  els.applyTheme.innerHTML = "";
-  for (const k of rewards.ownedOf("theme")) els.applyTheme.add(new Option(THEMES[k].label, k));
-  els.applyTheme.value = rewards.shop.theme;
+  renderEquip(); // 캐릭터 페이지 보유 목록 그리드
+}
+// 캐릭터 페이지 — 보유한 요정/테마를 그리드로 보여주고 눌러서 바로 장착 (상점 카드처럼)
+function renderEquip() {
+  const grid = $("equip-grid");
+  if (!grid) return;
+  const skinCard = (k) => {
+    const sk = SKINS[k] || SKINS.fairy;
+    const on = rewards.shop.skin === k;
+    const thumb = sk.spriteDir
+      ? `<img class="equip-thumb" src="${sk.spriteDir}/idle.gif" alt="" loading="lazy">`
+      : `<div class="equip-thumb emoji">${sk.good}</div>`;
+    return `<button class="equip-card${on ? " on" : ""}" data-type="skin" data-key="${k}">
+      ${thumb}<span class="equip-name">${sk.label}</span>
+      ${on ? '<span class="equip-badge">장착 중</span>' : ""}</button>`;
+  };
+  const themeChip = (k) => {
+    const th = THEMES[k] || THEMES.green;
+    const on = rewards.shop.theme === k;
+    return `<button class="equip-theme${on ? " on" : ""}" data-type="theme" data-key="${k}" title="${th.label}">
+      <span class="equip-sw" style="background:${th.accent}"></span><span>${th.label}</span></button>`;
+  };
+  grid.innerHTML =
+    `<div class="equip-sec-t">요정 (${rewards.ownedOf("skin").length})</div>` +
+    `<div class="equip-cards">${rewards.ownedOf("skin").map(skinCard).join("")}</div>` +
+    `<div class="equip-sec-t">테마 색</div>` +
+    `<div class="equip-themes">${rewards.ownedOf("theme").map(themeChip).join("")}</div>`;
 }
 function applyTheme() {
   document.documentElement.style.setProperty("--accent", rewards.accent());
@@ -1120,8 +1139,14 @@ els.setBlink.onchange = () => {
 };
 $("btn-report-close").onclick = () => els.reportOverlay.classList.remove("open");
 els.reportOverlay.onclick = (e) => { if (e.target === els.reportOverlay) els.reportOverlay.classList.remove("open"); };
-els.applySkin.onchange = () => { rewards.apply("skin", els.applySkin.value); };
-els.applyTheme.onchange = () => { rewards.apply("theme", els.applyTheme.value); applyTheme(); };
+// 보유 목록 그리드 — 카드 클릭으로 즉시 장착 (이벤트 위임: innerHTML 재렌더에도 유지)
+$("equip-grid")?.addEventListener("click", (e) => {
+  const b = e.target.closest(".equip-card, .equip-theme");
+  if (!b) return;
+  rewards.apply(b.dataset.type, b.dataset.key);
+  if (b.dataset.type === "theme") applyTheme();
+  renderEquip();
+});
 
 // ── 초기화 ──
 initSettings();

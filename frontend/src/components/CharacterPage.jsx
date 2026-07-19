@@ -31,13 +31,8 @@ export default function CharacterPage() {
       </div>
       <details id="character-equip" open>
         <summary>🎽 갈아입히기</summary>
-        <div className="row">
-          <label>요정</label>
-          <select id="apply-skin"></select>
-          <label>테마</label>
-          <select id="apply-theme"></select>
-        </div>
-        <p className="hint">보유한 스킨·테마만 목록에 나와요. 새 스킨은 [상점]에서 포인트로 살 수 있어요.</p>
+        <div id="equip-grid" className="equip-grid"></div>
+        <p className="hint">보유한 요정·테마를 눌러 바로 갈아입어요. 새 스킨은 [상점]에서 포인트로 살 수 있어요.</p>
       </details>
     </>
   );
