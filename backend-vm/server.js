@@ -4,6 +4,8 @@ import express from "express";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
 import pg from "pg";
+import http from "http";
+import { attachSignaling } from "./signaling.js";
 
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 10 });
 
@@ -205,5 +207,7 @@ app.get("/api/leaderboard", async (req, res) => {
   return res.json({ rows, champions });
 });
 
+const server = http.createServer(app);
+attachSignaling(server, pool); // WebRTC 시그널링 /ws (영상은 P2P, 서버는 중개만)
 const port = process.env.PORT || 8080;
-app.listen(port, "127.0.0.1", () => console.log(`posture-guard-api (pg) on :${port}`));
+server.listen(port, "127.0.0.1", () => console.log(`posture-guard-api (pg) on :${port}`));

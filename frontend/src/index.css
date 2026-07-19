@@ -440,3 +440,29 @@
 .champ-week { color: #9aa6c9; width: 58px; flex: none; }
 .champ-nick { flex: 1; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .champ-sec { color: #ffd970; font-variant-numeric: tabular-nums; }
+
+/* ── 실시간 그룹 카메라 (WebRTC) ── */
+.rtc-share { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 6px 0 4px; }
+.rtc-toggle { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; cursor: pointer; }
+.rtc-toggle input { width: 18px; height: 18px; accent-color: var(--accent); }
+.rtc-live { font-size: 12.5px; font-weight: 800; color: #ff6b6b;
+  background: #ff6b6b1a; border: 1px solid #ff6b6b44; padding: 3px 10px; border-radius: 999px;
+  animation: rtc-pulse 1.6s ease-in-out infinite; }
+@keyframes rtc-pulse { 0%,100% { opacity: 1; } 50% { opacity: .55; } }
+.rtc-err { color: #ff9a9a; }
+.rtc-peers { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.rtc-peer { display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; }
+.rtc-nick { font-weight: 600; font-size: 13.5px; }
+.rtc-off { font-size: 12px; color: var(--dim); }
+.rtc-view { background: var(--accent); color: #101418; border: none; border-radius: 999px;
+  padding: 5px 12px; font-size: 12.5px; font-weight: 800; cursor: pointer; }
+/* 뷰어 모달 */
+.rtc-modal { position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center;
+  background: #000a; padding: 16px; }
+.rtc-modal-in { width: 100%; max-width: 520px; background: var(--panel); border: 1px solid var(--line);
+  border-radius: 16px; padding: 14px; box-shadow: 0 20px 60px #000a; }
+.rtc-modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; font-size: 15px; }
+.rtc-close { background: #ffffff14; border: 1px solid #ffffff2a; color: var(--text);
+  width: 30px; height: 30px; border-radius: 50%; font-size: 14px; cursor: pointer; }
+.rtc-video { width: 100%; aspect-ratio: 4 / 3; background: #000; border-radius: 12px; object-fit: cover; display: block; }
