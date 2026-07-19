@@ -16,10 +16,12 @@ const IDX = { NOSE: 0, EAR_L: 7, EAR_R: 8, SH_L: 11, SH_R: 12 };
 const MIN_VIS = 0.5;
 
 // 절대 페널티 가중치 — core z-score 점수에 exp(-penalty)로 곱해 결합한다(0이면 무영향).
-const ABS_W = { head: 1.6, tilt: 0.6 };
+const ABS_W = { head: 1.6, tilt: 0.6, pitch: 1.0 };
 const HEAD_DROP_DEADZONE = 0.15; // 기준 대비 15% 이상 내려가야 페널티 시작
 const TILT_MARGIN_DEG = 8;       // 기준 + 8도 초과부터 페널티
 const TILT_FULL_DEG = 30;        // 30도 초과분에서 가중치 최대
+const PITCH_MARGIN_DEG = 15;     // 머리 각도가 기준에서 15도 이상 벗어나야 페널티(양방향, 여유 넉넉)
+const PITCH_FULL_DEG = 35;       // 35도 초과분에서 가중치 최대
 
 // ── One-Euro 필터 (지터는 줄이고 지연은 최소) ──
 class LowPass {
@@ -59,20 +61,47 @@ export function extractAbsolute(wlms) {
   return { headVertical, shoulderTilt };
 }
 
-// 매 프레임 raw 지표에 One-Euro 를 적용해 부드럽게.
+// FaceLandmarker facialTransformationMatrixes[0].data = 16개 column-major 4x4 (R|t),
+// 캐논 얼굴→카메라 좌표 변환. 회전부를 Tait-Bryan(Rz·Ry·Rx)로 분해 → {pitch,yaw,roll} 도.
+// 절대각의 관례 오프셋(캐논 얼굴 기준)은 캘리브 기준 pitch와의 '편차'로 상쇄되므로 무관.
+// 정면(똑바로) 자세는 짐벌락(sy≈0)에서 멀어 안정적으로 분해됨. 얼굴 없으면 null.
+export function headPoseFromMatrix(data) {
+  if (!data || data.length < 11) return null;
+  // column-major → 논리 R[row][col]: 열 j 는 data[4j .. 4j+3]
+  const r00 = data[0], r10 = data[1], r20 = data[2];
+  const r11 = data[5], r21 = data[6];
+  const r12 = data[9], r22 = data[10];
+  const D = 180 / Math.PI;
+  const sy = Math.hypot(r00, r10);
+  if (sy < 1e-6) { // 짐벌락(고개를 극단적으로 젖힘) — roll 을 0으로
+    return { pitch: Math.atan2(-r12, r11) * D, yaw: Math.atan2(-r20, sy) * D, roll: 0 };
+  }
+  return {
+    pitch: Math.atan2(r21, r22) * D, // 고개 끄덕임(위/아래)
+    yaw: Math.atan2(-r20, sy) * D,   // 좌우 돌림
+    roll: Math.atan2(r10, r00) * D,  // 갸웃
+  };
+}
+
+// 매 프레임 raw 지표에 One-Euro 를 적용해 부드럽게. headPitch 는 있을 때만(얼굴 모델 켜짐).
 export class AbsSmoother {
   constructor() {
     this.f = {
       headVertical: new OneEuro({ minCutoff: 0.8, beta: 0.01 }),
       shoulderTilt: new OneEuro({ minCutoff: 0.8, beta: 0.01 }),
+      headPitch: new OneEuro({ minCutoff: 0.8, beta: 0.02 }),
     };
   }
   update(m, t) {
     if (!m) return null;
-    return {
+    const out = {
       headVertical: this.f.headVertical.filter(m.headVertical, t),
       shoulderTilt: this.f.shoulderTilt.filter(m.shoulderTilt, t),
     };
+    if (m.headPitch != null && Number.isFinite(m.headPitch)) {
+      out.headPitch = this.f.headPitch.filter(m.headPitch, t);
+    }
+    return out;
   }
 }
 
@@ -86,11 +115,22 @@ const median = (arr) => {
 export function finishAbsRef(samples) {
   const good = samples.filter(Boolean);
   if (good.length < 3) return null;
-  return {
+  const ref = {
     headVertical: median(good.map((s) => s.headVertical)),
     shoulderTilt: median(good.map((s) => s.shoulderTilt)),
     n: good.length,
   };
+  // 얼굴 모델이 캘리브 동안 충분히 잡혔으면 머리 pitch 기준도 저장(없으면 pitch 게이트 off).
+  const pitches = good.map((s) => s.headPitch).filter((v) => v != null && Number.isFinite(v));
+  if (pitches.length >= Math.max(3, Math.floor(good.length * 0.3))) ref.headPitch = median(pitches);
+  return ref;
+}
+
+// 머리 pitch 편차(양방향, 여유 넉넉) → 0..1.5. m·ref 둘 다 headPitch 있을 때만.
+function pitchTerm(m, ref) {
+  if (m.headPitch == null || ref.headPitch == null) return 0;
+  const dp = Math.abs(m.headPitch - ref.headPitch) - PITCH_MARGIN_DEG;
+  return dp > 0 ? Math.min(dp / PITCH_FULL_DEG, 1.5) : 0;
 }
 
 // 좋은 기준 대비 얼마나 나빠졌는지 → 페널티(≥0). core 점수에 exp(-penalty)로 곱한다.
@@ -101,14 +141,17 @@ export function absPenalty(m, ref) {
   if (drop > HEAD_DROP_DEADZONE) pen += ABS_W.head * (drop - HEAD_DROP_DEADZONE);
   const tilt = m.shoulderTilt - (ref.shoulderTilt + TILT_MARGIN_DEG);
   if (tilt > 0) pen += ABS_W.tilt * Math.min(tilt / TILT_FULL_DEG, 1.5);
+  pen += ABS_W.pitch * pitchTerm(m, ref); // 전방머리/고개숙임(정면 카메라가 약한 축)
   return pen;
 }
 
 // 절대 지표 중 어떤 문제가 지배적인지 — Buddy 말풍선 부위 힌트용(없으면 null).
+// headVertical 감소와 pitch 편차는 둘 다 '목' 문제(hurt_neck), shoulderTilt 는 '등/어깨'.
 export function absWorst(m, ref) {
   if (!m || !ref || !ref.headVertical) return null;
-  const drop = (ref.headVertical - m.headVertical) / Math.max(ref.headVertical, 1e-3);
+  const drop = (ref.headVertical - m.headVertical) / Math.max(ref.headVertical, 1e-3) - HEAD_DROP_DEADZONE;
   const tilt = (m.shoulderTilt - (ref.shoulderTilt + TILT_MARGIN_DEG)) / TILT_FULL_DEG;
-  if (drop <= HEAD_DROP_DEADZONE && tilt <= 0) return null;
-  return (drop - HEAD_DROP_DEADZONE) >= tilt ? "head_drop" : "shoulder_roll";
+  const neck = Math.max(drop, pitchTerm(m, ref)); // 목 문제 = 수직드롭 또는 머리각 편차
+  if (neck <= 0 && tilt <= 0) return null;
+  return neck >= tilt ? "head_drop" : "shoulder_roll";
 }

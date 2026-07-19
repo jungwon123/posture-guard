@@ -5,7 +5,7 @@ import {
   StateMachine, finishCalibration, replay,
 } from "./core.js";
 // 3D 절대 지표 레이어 — 개인 z-score 위에 "거리에 강한 + 절대 바른자세" 게이트를 얹는다(core 무수정).
-import { AbsSmoother, extractAbsolute, finishAbsRef, absPenalty, absWorst } from "./posture3d.js";
+import { AbsSmoother, extractAbsolute, finishAbsRef, absPenalty, absWorst, headPoseFromMatrix } from "./posture3d.js";
 import { Rewards, MELODIES, SKINS, THEMES, SHOP, TIERS, computeReport } from "./reward.js";
 
 // React 마운트 후 1회 실행 (엔진 계층 — 카메라 루프·판정·알림·PiP)
@@ -111,6 +111,12 @@ let faceLoading = false;
 let blinkSampling = false, blinkWinStart = 0, blinkCount = 0, blinkClosed = false, blinkFaceFrames = 0;
 let nextBlinkAt = 0;            // 다음 측정 예정 시각(초)
 let blinkRate = null;          // 마지막 추정 분당 횟수
+// 얼굴 추론 통합(머리자세 + blink) — 틱당 detectForVideo 1회 공유(중복호출 방지)
+let faceHead = null;           // {pitch,yaw,roll} 최근 머리 자세(도), 얼굴 없으면 null
+let lastFaceFr = null;         // 이번 틱의 얼굴 결과(runFace가 채움, 없으면 null)
+let lastFaceDetect = 0;        // 머리자세 스로틀 기준(wallMs)
+let faceSeenAt = 0;            // 마지막으로 얼굴이 잡힌 시각(초) — 오래 없으면 pitch 무효화
+const FACE_HEAD_GAP = 180;     // 머리자세용 얼굴 추론 최소 간격(ms) ≈ 5.5Hz (폰 부담 완화)
 
 const profile = store.loadProfile();
 if (profile) { judge = new Judge(profile); sm.state = "GOOD"; absRef = profile.absRef || null; }
@@ -274,7 +280,7 @@ async function start() {
       : "바르게 앉은 뒤 [기준 등록]을 누르세요.";
   }
   if (judge) logTransition(null, sm.state, nowSec());
-  if (blinkEnabled) ensureFaceModel(); // 눈 깜빡임 켜져 있으면 얼굴 모델 로드
+  ensureFaceModel(); // 머리자세 판정(+눈 깜빡임)용 얼굴 모델 프리로드 — 캘리브 전에 준비되도록
   // PiP 폴백용 스트림 예열 — 클릭 시 await 없이 바로 요청해 user activation 소진을 막는다
   drawMini(sm.state, null, rewards.fairy(sm.state, 0, false), false, nowSec());
   if (!els.miniVideo.srcObject) els.miniVideo.srcObject = els.miniCanvas.captureStream(2);
@@ -301,7 +307,7 @@ function stop() {
   ctx.clearRect(0, 0, els.track.width, els.track.height);
 }
 
-// ── 눈 깜빡임: 얼굴 모델 (켤 때만 로드) ──
+// ── 얼굴 모델 로드 (머리자세 판정 + 눈 깜빡임 공용) ──
 async function ensureFaceModel() {
   if (faceLandmarker || faceLoading) return;
   faceLoading = true;
@@ -319,7 +325,9 @@ async function ensureFaceModel() {
           "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
         delegate: "GPU",
       },
-      runningMode: "VIDEO", numFaces: 1, outputFaceBlendshapes: true,
+      runningMode: "VIDEO", numFaces: 1,
+      outputFaceBlendshapes: true,               // 눈 깜빡임(blink)용
+      outputFacialTransformationMatrixes: true,  // 머리 자세(pitch/yaw)용
     });
     els.blinkStatus.textContent = "준비됨 · 곧 측정해요";
     nextBlinkAt = nowSec() + BLINK_FIRST_DELAY;
@@ -332,8 +340,25 @@ async function ensureFaceModel() {
   }
 }
 
-// 주기 샘플링: 평소엔 쉬고, 정해진 시각에 30초간 깜빡임을 센다
-function processBlink(now, wallMs) {
+// 얼굴 추론 통합 — 틱당 detectForVideo 1회로 머리자세 + blink 를 함께 처리(중복호출 방지).
+// blink 샘플 창에서는 매 프레임, 그 외엔 머리자세용으로만 ~5.5Hz 스로틀(폰 부담 완화). 결과=lastFaceFr.
+function runFace(now, wallMs) {
+  lastFaceFr = null;
+  if (!faceLandmarker) return;
+  const sampling = blinkEnabled && blinkSampling && calibUntil === null; // blink 창은 풀레이트
+  const dueHead = wallMs - lastFaceDetect >= FACE_HEAD_GAP;              // 머리자세는 스로틀
+  if (!sampling && !dueHead) return;
+  try { lastFaceFr = faceLandmarker.detectForVideo(els.cam, wallMs); }
+  catch { lastFaceFr = null; return; }
+  lastFaceDetect = wallMs;
+  const hp = headPoseFromMatrix(lastFaceFr.facialTransformationMatrixes?.[0]?.data);
+  if (hp) { faceHead = hp; faceSeenAt = now; }
+  else if (now - faceSeenAt > 1.5) faceHead = null; // 얼굴이 오래 사라지면 pitch 무효화
+}
+
+// 주기 샘플링: 평소엔 쉬고, 정해진 시각에 30초간 깜빡임을 센다.
+// detectForVideo 는 runFace 가 이미 호출했고, 여기선 그 결과(lastFaceFr)의 blendshapes 만 소비.
+function processBlink(now) {
   if (!blinkEnabled || !faceLandmarker || calibUntil !== null) return;
 
   if (!blinkSampling) {
@@ -346,21 +371,18 @@ function processBlink(now, wallMs) {
     blinkSampling = true; blinkWinStart = now; blinkCount = 0; blinkClosed = false; blinkFaceFrames = 0;
   }
 
-  // 샘플 창: 매 프레임 얼굴 추론 → 깜빡임(눈 감김의 상승 에지) 카운트
+  // 샘플 창: 이번 틱 얼굴 결과에서 깜빡임(눈 감김의 상승 에지) 카운트
   els.blink.style.display = "";
   els.blink.textContent = "👁 측정 중…";
-  try {
-    const fr = faceLandmarker.detectForVideo(els.cam, wallMs);
-    const bs = fr.faceBlendshapes?.[0]?.categories;
-    if (bs) {
-      blinkFaceFrames++;
-      const l = bs.find((c) => c.categoryName === "eyeBlinkLeft")?.score || 0;
-      const r = bs.find((c) => c.categoryName === "eyeBlinkRight")?.score || 0;
-      const closed = (l + r) / 2 > BLINK_CLOSE;
-      if (closed && !blinkClosed) blinkCount++; // 감기 시작 = 1회
-      blinkClosed = closed;
-    }
-  } catch {}
+  const bs = lastFaceFr?.faceBlendshapes?.[0]?.categories;
+  if (bs) {
+    blinkFaceFrames++;
+    const l = bs.find((c) => c.categoryName === "eyeBlinkLeft")?.score || 0;
+    const r = bs.find((c) => c.categoryName === "eyeBlinkRight")?.score || 0;
+    const closed = (l + r) / 2 > BLINK_CLOSE;
+    if (closed && !blinkClosed) blinkCount++; // 감기 시작 = 1회
+    blinkClosed = closed;
+  }
 
   if (now - blinkWinStart >= BLINK_WINDOW_SEC) {
     blinkSampling = false;
@@ -398,6 +420,7 @@ function tick() {
   if (wallMs - lastDetect >= minGap && els.cam.readyState >= 2) {
     lastDetect = wallMs;
     let sig = null, absM = null;
+    lastFaceFr = null; // pose detect가 throw해도 blink가 이전 틱 프레임을 재소비하지 않도록
     try {
       lastResult = landmarker.detectForVideo(els.cam, wallMs);
       const lms = lastResult.landmarks?.[0];
@@ -405,11 +428,14 @@ function tick() {
         const raw = extractSignals(lms);
         if (raw) sig = smoother.update(raw);
       }
-      // 3D 절대 지표(미터 world 좌표) — 추가 추론비용 0, 없으면 null
-      absM = absSmoother.update(extractAbsolute(lastResult.worldLandmarks?.[0]), now);
+      runFace(now, wallMs); // 얼굴 추론 1회(머리자세 + blink 공유) → faceHead 갱신
+      // 3D 절대 지표(미터 world 좌표, 추가 추론비용 0) + 얼굴 머리 pitch(있으면). 없으면 null
+      const raw3d = extractAbsolute(lastResult.worldLandmarks?.[0]);
+      if (raw3d && faceHead) raw3d.headPitch = faceHead.pitch;
+      absM = absSmoother.update(raw3d, now);
     } catch {}
 
-    processBlink(now, wallMs); // 눈 깜빡임 주기 샘플링 (켜져 있을 때만)
+    processBlink(now); // 눈 깜빡임 — runFace가 채운 lastFaceFr 소비 (켜져 있을 때만)
 
     // 캘리브레이션 수집
     if (calibUntil !== null) {
@@ -455,7 +481,8 @@ function tick() {
     let worst = null, worstZ = TUNING.DEADZONE_Z;
     for (const k in zs) if (zs[k] > worstZ) { worstZ = zs[k]; worst = k; }
     if (!worst && absRef && absM) worst = absWorst(absM, absRef); // 2D가 못 짚으면 3D 절대 지표로
-    window.__pgLive = { running: true, state, score, worst, dur, ts: now };
+    window.__pgLive = { running: true, state, score, worst, dur, ts: now,
+      pitch: faceHead ? Math.round(faceHead.pitch) : null }; // 실기기 부호 확인·디버그용
 
     if (state !== prev) {
       logTransition(prev, state, now);
@@ -1156,7 +1183,7 @@ els.setBlink.onchange = () => {
   blinkEnabled = els.setBlink.checked;
   localStorage.setItem("pg_blink", blinkEnabled ? "1" : "0");
   if (blinkEnabled) {
-    if (running) ensureFaceModel();
+    if (running) { ensureFaceModel(); nextBlinkAt = nowSec() + BLINK_FIRST_DELAY; } // 모델이 이미 로드돼 있어도 15초 지연 보장
     else els.blinkStatus.textContent = "카메라를 시작하면 측정을 시작해요";
   } else {
     blinkSampling = false;
