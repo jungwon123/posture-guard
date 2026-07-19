@@ -1,0 +1,7 @@
+{
+  "tool_name": "mcp__Claude_Browser__javascript_tool",
+  "tool_input_preview": "{\"tabId\":\"tab-2\",\"action\":\"javascript_exec\",\"text\":\"(() => {\\n  const cb = document.getElementById(\\\"set-blink\\\");\\n  const before = { exists: !!cb, checked: cb.checked, blinkVisible: getComputedStyle...",
+  "error": "javascript_tool failed: TypeError: Cannot read properties of null (reading 'checked')\n    at <anonymous>:3:46\n    at <anonymous>:11:3",
+  "timestamp": "2026-07-18T23:41:28.943Z",
+  "retry_count": 1
+}

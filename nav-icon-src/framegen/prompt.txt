@@ -1,0 +1,7 @@
+A single square decorative BORDER FRAME for a pastel fairy game UI card, flat straight-on front view, the frame filling the whole image right up to all four edges.
+
+Draw ONLY a thin rounded-rectangle ornamental border: a smooth soft cream-and-pastel-gold rounded band with gentle glossy 3D rounded edges and a soft glow. The band must have the SAME uniform thickness on all four sides. Place one small delicate ornament at EACH of the four corners ONLY: a tiny pastel flower with a little green leaf sprout and a small pastel crystal, soft and cute, matching a dreamy pastel fairy forest.
+
+The four straight edges between the corners must be a plain, smooth, uniform cream-gold band with NO ornaments on them, so the edges can stretch cleanly.
+
+The entire inside area within the border is completely empty. Fill EVERYTHING that is not the drawn frame — both the empty inside area and the area outside the frame — with flat solid pure green #00FF00. Do not use green anywhere on the frame itself. No text, no letters, no character, no scenery, no drop shadow on the green.

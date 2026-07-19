@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>척추요정</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="theme-color" content="#101418">
+<style>
+  :root {
+    --bg: #101418; --panel: #171c22; --line: #2a323c;
+    --text: #e7ecf1; --dim: #8b98a5; --accent: #5abe5a;
+    --good: #5abe5a; --bad: #e64545; --away: #a0a0a0; --uncal: #e6aa3c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, "Apple SD Gothic Neo", sans-serif;
+  }
+  header {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding: 12px 16px; border-bottom: 1px solid var(--line);
+  }
+  header h1 { font-size: 16px; margin: 0; }
+  #fairy { font-size: 22px; }
+  #fairy-img {
+    width: 38px; height: 38px; display: none; image-rendering: pixelated;
+    vertical-align: middle;
+  }
+  #fairy-img.dim { filter: grayscale(.8) opacity(.55); }
+  #state-pill {
+    padding: 3px 12px; border-radius: 999px; font-weight: 700; font-size: 13px;
+    background: var(--uncal); color: #101418;
+  }
+  #score { font-variant-numeric: tabular-nums; color: var(--dim); }
+  #points {
+    padding: 3px 10px; border-radius: 999px; font-size: 13px; font-weight: 700;
+    border: 1px solid var(--accent); color: var(--accent); transition: transform .2s;
+  }
+  #points.flash { transform: scale(1.25); }
+  main {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+    padding: 12px 16px; max-width: 1400px;
+  }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  .panel {
+    position: relative; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; overflow: hidden; aspect-ratio: 4 / 3;
+  }
+  .panel .label {
+    position: absolute; top: 8px; left: 10px; font-size: 12px; color: var(--dim);
+    z-index: 3; text-shadow: 0 1px 2px #000;
+  }
+  video, canvas.fill { width: 100%; height: 100%; object-fit: cover; display: block; }
+  #cam { transform: scaleX(-1); }
+  #cam-panel.bad { outline: 4px solid var(--bad); outline-offset: -4px; }
+  #cam-panel.bad-hard { outline-width: 10px; }
+  #vignette {
+    position: absolute; inset: 0; z-index: 2; pointer-events: none; opacity: 0;
+    background: radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,.75) 100%);
+    transition: opacity .8s;
+  }
+  #cam-panel.vignette #vignette { opacity: 1; }
+  /* 얼굴 가리기: 영상은 밑에서 계속 재생(감지 유지), 위를 불투명 커버로 덮음 */
+  #face-cover {
+    position: absolute; inset: 0; z-index: 4; display: none;
+    flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+    background: var(--panel); text-align: center; padding: 12px;
+  }
+  #cam-panel.face-hidden #face-cover { display: flex; }
+  #face-cover img { width: 96px; height: 96px; image-rendering: pixelated; }
+  #face-cover .fc-emoji { font-size: 76px; line-height: 1; }
+  #face-cover .fc-text { color: var(--dim); font-size: 13px; }
+  #controls {
+    display: flex; flex-wrap: wrap; gap: 8px; padding: 0 16px 8px; align-items: center;
+  }
+  button {
+    background: var(--panel); color: var(--text); border: 1px solid var(--line);
+    border-radius: 8px; padding: 8px 14px; font-size: 14px; cursor: pointer;
+  }
+  button:hover { border-color: var(--dim); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #101418; font-weight: 700; }
+  button:disabled { opacity: .45; cursor: default; }
+  #msg { padding: 4px 16px 12px; color: var(--dim); font-size: 13px; min-height: 20px; }
+  #summary { padding: 0 16px 8px; color: var(--dim); font-size: 13px; }
+  details {
+    margin: 0 16px 10px; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 10px 14px; max-width: 720px;
+  }
+  details summary { cursor: pointer; font-weight: 700; font-size: 14px; }
+  .row { display: flex; align-items: center; gap: 10px; margin: 10px 0; flex-wrap: wrap; font-size: 14px; }
+  .row label { color: var(--dim); min-width: 72px; }
+  select, input[type=range] { accent-color: var(--accent); }
+  select, input[type=text] {
+    background: var(--bg); color: var(--text); border: 1px solid var(--line);
+    border-radius: 6px; padding: 5px 8px;
+  }
+  #leaderboard table { border-collapse: collapse; width: 100%; font-size: 14px; margin-top: 6px; }
+  #leaderboard td, #leaderboard th { padding: 5px 6px; border-bottom: 1px solid var(--line); text-align: left; }
+  #leaderboard td:last-child, #leaderboard th:last-child { text-align: right; }
+  #leaderboard tr.me td { color: var(--accent); font-weight: 700; }
+  .shop-item {
+    display: flex; align-items: center; gap: 10px; padding: 8px 0;
+    border-bottom: 1px solid var(--line); font-size: 14px;
+  }
+  .shop-item:last-child { border-bottom: none; }
+  .shop-item .price { color: var(--accent); margin-left: auto; }
+  #report-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none;
+    align-items: center; justify-content: center; z-index: 10;
+  }
+  #report-overlay.open { display: flex; }
+  #report-card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    padding: 22px 26px; min-width: 320px; max-width: 90vw;
+  }
+  #report-card h2 { margin: 0 0 14px; font-size: 17px; }
+  #report-card table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  #report-card td { padding: 6px 4px; }
+  #report-card td:last-child { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; }
+  #report-grade { margin-top: 12px; color: var(--accent); font-weight: 700; }
+  #replay-input, #song-file { display: none; }
+  a.tool { color: var(--dim); font-size: 12px; margin-left: auto; cursor: pointer; }
+  .hint { font-size: 12px; color: var(--dim); }
+  #install-banner {
+    display: none; position: fixed; left: 12px; right: 12px; bottom: 12px; z-index: 50;
+    background: var(--panel); border: 1px solid var(--accent); border-radius: 12px;
+    padding: 12px 14px; align-items: center; gap: 10px;
+    box-shadow: 0 6px 24px rgba(0,0,0,.5); max-width: 520px; margin: 0 auto;
+  }
+  #install-banner.show { display: flex; }
+  #install-banner .ib-icon { font-size: 26px; flex: none; }
+  #install-banner .ib-text { flex: 1; font-size: 13.5px; line-height: 1.4; }
+  #install-banner .ib-action {
+    background: var(--accent); border-color: var(--accent); color: #101418; font-weight: 700;
+    white-space: nowrap;
+  }
+  #install-banner .ib-close { padding: 6px 9px; color: var(--dim); }
+</style>
+</head>
+<body>
+<header>
+  <h1>척추요정</h1>
+  <span id="fairy" title="척추요정">🥚</span>
+  <img id="fairy-img" alt="척추요정" title="척추요정">
+
+  <span id="state-pill">준비 중</span>
+  <span id="score">score --</span>
+  <span id="points">🪙 0P</span>
+  <span id="blink" style="display:none">👁 --</span>
+  <a class="tool" id="replay-link">리플레이 검증(JSON)</a>
+  <input type="file" id="replay-input" accept=".json">
+</header>
+
+<main>
+  <div class="panel" id="cam-panel">
+    <span class="label">내 화면</span>
+    <video id="cam" autoplay playsinline muted></video>
+    <div id="vignette"></div>
+    <div id="face-cover">
+      <img id="fc-img" alt="척추요정">
+      <span class="fc-emoji" id="fc-emoji">🧚</span>
+      <div class="fc-text">얼굴 숨김 중 · 감지는 계속돼요</div>
+    </div>
+  </div>
+  <div class="panel">
+    <span class="label">TRACKING</span>
+    <canvas id="track" class="fill" width="640" height="480"></canvas>
+  </div>
+</main>
+
+<div id="controls">
+  <button id="btn-start" class="primary">카메라 시작</button>
+  <button id="btn-calib" disabled>기준 등록 (5초)</button>
+  <button id="btn-notify">알림 허용</button>
+  <button id="btn-pip" disabled>미니 모드 (PiP)</button>
+  <button id="btn-face">얼굴 가리기</button>
+  <button id="btn-report">오늘 리포트</button>
+</div>
+<div id="msg">카메라 시작을 누르면 감지가 시작됩니다. 영상은 저장·전송되지 않습니다.</div>
+<div id="summary"></div>
+
+<details id="settings">
+  <summary>🔔 알림 설정</summary>
+  <div class="row">
+    <label>방식</label>
+    <select id="set-mode">
+      <option value="sound">소리</option>
+      <option value="vibrate">진동 (안드로이드만)</option>
+      <option value="both">소리 + 진동</option>
+      <option value="silent">무음 (배너만)</option>
+    </select>
+    <button id="btn-test">알림 테스트</button>
+  </div>
+  <div class="row">
+    <label>알림음</label>
+    <select id="set-melody"></select>
+    <label style="min-width:auto"><input type="checkbox" id="set-custom"> 내 노래 사용</label>
+    <button id="btn-song">노래 파일 선택</button>
+    <input type="file" id="song-file" accept="audio/*">
+    <span class="hint" id="song-name"></span>
+  </div>
+  <div class="row">
+    <label>음량</label>
+    <input type="range" id="set-volume" min="0" max="100" value="70">
+    <label>진동 횟수</label>
+    <select id="set-vibrate">
+      <option value="1">1회</option>
+      <option value="2">2회</option>
+      <option value="3">3회</option>
+    </select>
+  </div>
+  <div class="hint">노래는 2MB 이하 오디오 파일 — 브라우저 안에만 저장됩니다 (서버 업로드 없음).</div>
+</details>
+
+<details id="eyecare">
+  <summary>👁 눈 깜빡임 챙기기 (베타)</summary>
+  <div class="row">
+    <label style="min-width:auto"><input type="checkbox" id="set-blink"> 눈 깜빡임도 재기</label>
+    <span class="hint" id="blink-status"></span>
+  </div>
+  <div class="hint">몇 분마다 잠깐씩(≈30초) 눈 깜빡임을 재서 분당 횟수를 알려줘요. 너무 적으면(눈 건조) 알림을 보냅니다. 배터리 아끼려고 계속이 아니라 주기적으로만 잽니다.</div>
+</details>
+
+<details id="group">
+  <summary>👥 그룹 랭킹 (이번 주 바른 자세)</summary>
+  <div class="row">
+    <input type="text" id="group-name" placeholder="그룹 이름" maxlength="20" style="width:130px">
+    <button id="btn-group-create">그룹 만들기</button>
+  </div>
+  <div class="row">
+    <input type="text" id="group-code" placeholder="6자리 코드" maxlength="6" style="width:110px">
+    <input type="text" id="group-nick" placeholder="닉네임" maxlength="12" style="width:110px">
+    <button id="btn-group-join">참여하기</button>
+  </div>
+  <div id="group-info" class="hint"></div>
+  <div id="leaderboard"></div>
+</details>
+
+<details id="shop">
+  <summary>🛍️ 상점 & 꾸미기</summary>
+  <div id="shop-list"></div>
+  <div class="row">
+    <label>요정</label><select id="apply-skin"></select>
+    <label>테마</label><select id="apply-theme"></select>
+  </div>
+</details>
+
+<div id="report-overlay">
+  <div id="report-card">
+    <h2>📋 오늘 리포트</h2>
+    <img id="report-fairy" style="width:72px;height:72px;image-rendering:pixelated;display:block;margin:0 auto 10px">
+    <table id="report-table"></table>
+    <div id="report-grade"></div>
+    <div class="row" style="justify-content:flex-end; margin-top:14px">
+      <button id="btn-report-close">닫기</button>
+    </div>
+  </div>
+</div>
+
+<div id="install-banner">
+  <span class="ib-icon">📲</span>
+  <span class="ib-text" id="install-text"></span>
+  <button class="ib-action" id="install-action">설치</button>
+  <button class="ib-close" id="install-close">✕</button>
+</div>
+
+<canvas id="mini-canvas" width="280" height="90" style="display:none"></canvas>
+<video id="mini-video" muted playsinline style="display:none"></video>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+{
+  "kind": "sprite-gen-image-report",
+  "provider": "codex",
+  "prompt": "A single SIMPLE delicate decorative BORDER FRAME for a pastel fairy game UI, flat straight-on front view, the frame filling the whole image right up to all four edges.\nDraw ONLY a thin rounded-rectangle border: a slim smooth uniform band of soft cream and pale gold with gentle rounded edges and a very subtle soft glow. Keep it minimal and clean. Place one tiny small pale-lavender crystal accent at EACH of the four corners only. The four straight edges between corners are plain, smooth and uniform with NO ornaments.\nThe entire inside area within the border is completely empty. Fill EVERYTHING that is not the drawn frame (both the empty inside and the area outside) with flat solid pure green #00FF00. Do not use any green on the frame itself. No text, no character, no scenery, no drop shadow.",
+  "out": "/Users/jwon/Downloads/turtle/nav-icon-src/tierframes/raw/rare.png",
+  "raw": "/Users/jwon/Downloads/turtle/nav-icon-src/tierframes/raw/rare.png.raw.png",
+  "raw_bytes": 937332,
+  "elapsed_seconds": 35.133,
+  "model": null,
+  "session_id": "019f7c29-f518-7303-8622-34a880c7ca76",
+  "refs": [],
+  "transparent": false,
+  "chroma": null,
+  "extra": {
+    "inline_results": 1,
+    "rollout_cleaned": true
+  },
+  "report": "/Users/jwon/Downloads/turtle/nav-icon-src/tierframes/logs/report-rare.json"
+}

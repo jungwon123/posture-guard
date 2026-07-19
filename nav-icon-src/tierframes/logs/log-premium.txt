@@ -1,0 +1,19 @@
+{
+  "kind": "sprite-gen-image-report",
+  "provider": "codex",
+  "prompt": "A single LAVISH LUXURIOUS ornate decorative BORDER FRAME for a pastel fairy game UI, flat straight-on front view, the frame filling the whole image right up to all four edges.\nDraw ONLY a rounded-rectangle border: an ornate smooth band of rich shining gold with pastel accents, rounded glossy jewelled edges and a warm golden glow. At EACH of the four corners place an elaborate gorgeous cluster: pastel pink and white flowers, shining purple pastel crystals, a pair of tiny translucent fairy wings, and small sparkles. The four straight edges between corners stay smooth and uniform with NO ornaments (so they can stretch cleanly). The most gorgeous, most ornate and luxurious of a fairy collection.\nThe entire inside area within the border is completely empty. Fill EVERYTHING that is not the drawn frame (both the empty inside and the area outside) with flat solid pure green #00FF00. Do not use any green on the frame itself. No text, no character, no scenery, no drop shadow.",
+  "out": "/Users/jwon/Downloads/turtle/nav-icon-src/tierframes/raw/premium.png",
+  "raw": "/Users/jwon/Downloads/turtle/nav-icon-src/tierframes/raw/premium.png.raw.png",
+  "raw_bytes": 1479549,
+  "elapsed_seconds": 60.345,
+  "model": null,
+  "session_id": "019f7c29-f70a-7f20-b857-8a6626af8eaf",
+  "refs": [],
+  "transparent": false,
+  "chroma": null,
+  "extra": {
+    "inline_results": 1,
+    "rollout_cleaned": true
+  },
+  "report": "/Users/jwon/Downloads/turtle/nav-icon-src/tierframes/logs/report-premium.json"
+}

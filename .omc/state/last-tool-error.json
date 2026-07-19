@@ -1,0 +1,7 @@
+{
+  "tool_name": "mcp__Claude_Browser__navigate",
+  "tool_input_preview": "{\"tabId\":\"seed\",\"url\":\"http://localhost:8137\"}",
+  "error": "navigation to http://localhost:8137 was denied or failed",
+  "timestamp": "2026-07-17T19:38:15.125Z",
+  "retry_count": 1
+}

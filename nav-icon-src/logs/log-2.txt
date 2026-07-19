@@ -1,0 +1,19 @@
+{
+  "kind": "sprite-gen-image-report",
+  "provider": "codex",
+  "prompt": "Create a single horizontal row containing EXACTLY 5 cute mobile-app bottom-navigation icons for a soft pastel fairy-forest posture app. Place the 5 icons evenly spaced left to right in 5 equal invisible square slots, each icon centered inside its slot with generous margin, none touching its neighbor.\n\nONE consistent art style across all 5 icons: soft 3D claymorphic kawaii game-UI icons, smooth glossy rounded shapes, gentle soft top lighting, a soft pastel outer glow, no hard black outlines, no flat vector look. Pastel dreamy palette only: lavender, mint green, soft pink, cream, and gentle warm gold accents. Same rendering, same light direction, same proportions, same level of detail on every icon so they read as one matched set.\n\nThe 5 icons, strictly in this left-to-right order:\n1) a cozy pastel fairy mushroom cottage (a rounded toadstool house with a little door and window).\n2) a friendly cluster of three tiny chibi fairies grouped together, each with small translucent wings.\n3) a pastel treasure chest with a few tiny glowing crystals on it.\n4) a single cute chibi fairy standing front-facing with translucent wings and a little leaf sprout on the head.\n5) a pastel-and-gold ornate magic key with a small heart-shaped bow at the top.\n\nEach icon must be one clear self-contained rounded silhouette that stays readable when shrunk very small. No text, no letters, no numbers, no labels, no UI panels, no frames, no scenery, no cast shadows on the background. Flat solid pure white #FFFFFF background filling the entire image.",
+  "out": "/Users/jwon/Downloads/turtle/frontend/public/assets/ui/navgen/raw/sheet-2.png",
+  "raw": "/Users/jwon/Downloads/turtle/frontend/public/assets/ui/navgen/raw/sheet-2.png.raw.png",
+  "raw_bytes": 1081957,
+  "elapsed_seconds": 61.861,
+  "model": null,
+  "session_id": "019f7bda-e80b-7f13-9843-2dac4dca97cb",
+  "refs": [],
+  "transparent": false,
+  "chroma": null,
+  "extra": {
+    "inline_results": 1,
+    "rollout_cleaned": true
+  },
+  "report": "/Users/jwon/Downloads/turtle/frontend/public/assets/ui/navgen/logs/report-2.json"
+}

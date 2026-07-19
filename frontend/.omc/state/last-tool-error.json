@@ -1,0 +1,7 @@
+{
+  "tool_name": "mcp__Claude_Browser__javascript_tool",
+  "tool_input_preview": "{\"action\":\"javascript_exec\",\"text\":\"\\n(() => {\\n  const texts = [...document.querySelectorAll('svg text')].map(t => ({\\n    s: t.textContent, y: Math.round(t.getBBox().y)\\n  })).filter(o => /분$/.test(...",
+  "error": "MCP error -32602: Input validation error: Invalid arguments for tool javascript_tool: [\n  {\n    \"expected\": \"string\",\n    \"code\": \"invalid_type\",\n    \"path\": [\n      \"tabId\"\n    ],\n    \"message\": \"Invalid input: expected string, received undefined\"\n  }\n]",
+  "timestamp": "2026-07-19T17:47:28.696Z",
+  "retry_count": 1
+}

@@ -1,0 +1,44 @@
+// 캐릭터 페이지 — 현재 장착 캐릭터 미리보기 + 보유 스킨/테마 장착 (select는 엔진이 관리)
+import { useEffect, useState } from "react";
+import { SKINS, THEMES } from "../reward.js";
+
+function readShop() {
+  return { owned: [], skin: "fairy", theme: "green", ...JSON.parse(localStorage.getItem("pg_shop") || "{}") };
+}
+
+export default function CharacterPage() {
+  const [shop, setShop] = useState(readShop);
+  useEffect(() => {
+    const id = setInterval(() => setShop(readShop()), 2000);
+    return () => clearInterval(id);
+  }, []);
+
+  const skin = SKINS[shop.skin] || SKINS.fairy;
+  const theme = THEMES[shop.theme] || THEMES.green;
+
+  return (
+    <>
+      <img className="page-banner wide" src="/assets/ui/character.png" alt="캐릭터" />
+      <div className="card char-card">
+        <span className="hint">지금 장착 중</span>
+        {skin.spriteDir ? (
+          <img className="char-preview" src={`/${skin.spriteDir}/idle.gif`} alt={skin.label} />
+        ) : (
+          <div className="char-preview-emoji">{skin.good}</div>
+        )}
+        <b>{skin.label}</b>
+        <span className="hint">테마: {theme.label}</span>
+      </div>
+      <details id="character-equip" open>
+        <summary>🎽 갈아입히기</summary>
+        <div className="row">
+          <label>요정</label>
+          <select id="apply-skin"></select>
+          <label>테마</label>
+          <select id="apply-theme"></select>
+        </div>
+        <p className="hint">보유한 스킨·테마만 목록에 나와요. 새 스킨은 [상점]에서 포인트로 살 수 있어요.</p>
+      </details>
+    </>
+  );
+}
