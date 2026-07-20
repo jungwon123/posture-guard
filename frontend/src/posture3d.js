@@ -16,10 +16,10 @@ const IDX = { NOSE: 0, EAR_L: 7, EAR_R: 8, SH_L: 11, SH_R: 12 };
 const MIN_VIS = 0.5;
 
 // 절대 페널티 가중치 — core z-score 점수에 exp(-penalty)로 곱해 결합한다(0이면 무영향).
-const ABS_W = { head: 1.6, tilt: 0.6, pitch: 1.0, forward: 1.2 }; // forward=거북목 전방이동(기기검증 전 보수적)
+const ABS_W = { head: 1.6, tilt: 1.2, pitch: 1.0, forward: 1.2 }; // tilt↑(0.6→1.2): 어깨 기울기 반응성 강화
 const HEAD_DROP_DEADZONE = 0.15; // 기준 대비 15% 이상 내려가야 페널티 시작
-const TILT_MARGIN_DEG = 8;       // 기준 + 8도 초과부터 페널티
-const TILT_FULL_DEG = 30;        // 30도 초과분에서 가중치 최대
+const TILT_MARGIN_DEG = 5;       // 기준 + 5도 초과부터 페널티(8→5, 더 민감)
+const TILT_FULL_DEG = 18;        // 18도 초과분에서 가중치 최대(30→18: 현실적 기울기서 확실히 감점)
 const PITCH_MARGIN_DEG = 15;     // 머리 각도가 기준에서 15도 이상 벗어나야 페널티(양방향, 여유 넉넉)
 const PITCH_FULL_DEG = 35;       // 35도 초과분에서 가중치 최대
 const FORWARD_MARGIN = 0.10;     // 기준 대비 정규화 0.10 이상 '앞으로' 나와야 페널티(Z 노이즈 여유)

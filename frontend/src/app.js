@@ -500,10 +500,15 @@ function tick() {
     if (!worst && absRef && absM) worst = absWorst(absM, absRef); // 2D가 못 짚으면 3D 절대 지표로
     window.__pgLive = { running: true, state, score, worst, dur, ts: now,
       pitch: faceHead ? Math.round(faceHead.pitch) : null, // 실기기 부호 확인·디버그용
-      // 전방머리(거북목) Phase1 검증용 — 측정값만(판정 미반영). 부호/유의성은 실기기 로그로 확정.
-      fwd: absM?.headForward != null ? +absM.headForward.toFixed(4) : null,
-      fwdRef: absRef?.headForward != null ? +absRef.headForward.toFixed(4) : null,
-      fwdDev: (absM?.headForward != null && absRef?.headForward != null) ? +(absM.headForward - absRef.headForward).toFixed(4) : null };
+      absOn: !!(absRef && absM),                            // 절대 게이트(어깨기울기·거북목·머리각) 작동 여부
+      absPen: (absRef && absM) ? +absPenalty(absM, absRef).toFixed(2) : null, // 총 절대 페널티
+      // 전방머리(거북목)
+      fwd: absM?.headForward != null ? +absM.headForward.toFixed(3) : null,
+      fwdRef: absRef?.headForward != null ? +absRef.headForward.toFixed(3) : null,
+      fwdDev: (absM?.headForward != null && absRef?.headForward != null) ? +(absM.headForward - absRef.headForward).toFixed(3) : null,
+      // 어깨 기울기
+      tilt: absM?.shoulderTilt != null ? +absM.shoulderTilt.toFixed(1) : null,
+      tiltRef: absRef?.shoulderTilt != null ? +absRef.shoulderTilt.toFixed(1) : null };
 
     if (state !== prev) {
       logTransition(prev, state, now);
@@ -1296,8 +1301,15 @@ if (new URLSearchParams(location.search).has("fwd")) {
   document.body.appendChild(dbg);
   setInterval(() => {
     const L = window.__pgLive || {};
-    const dev = L.fwdDev, on = dev != null && dev > 0.10;
-    dbg.textContent = `headForward (거북목 판정 ON)\n현재 : ${L.fwd ?? "-"}\n기준 : ${L.fwdRef ?? "-"}\nΔ    : ${dev ?? "-"}  ${on ? "⚠️감점" : "(>0.10 감점)"}\npitch: ${L.pitch ?? "-"}`;
+    const dev = L.fwdDev, fwdBad = dev != null && dev > 0.10;
+    const tiltBad = (L.tilt != null && L.tiltRef != null) && (L.tilt > L.tiltRef + 5);
+    dbg.textContent =
+      `자세 게이트 진단\n` +
+      `게이트: ${L.absOn ? "ON ✅" : "OFF ❌(재캘리브 필요)"}\n` +
+      `총 페널티: ${L.absPen ?? "-"}\n` +
+      `─ 거북목 fwd: ${L.fwd ?? "-"} / 기준 ${L.fwdRef ?? "-"} · Δ ${dev ?? "-"} ${fwdBad ? "⚠️" : ""}\n` +
+      `─ 어깨기울 : ${L.tilt ?? "-"}° / 기준 ${L.tiltRef ?? "-"}° ${tiltBad ? "⚠️감점" : "(기준+5°~)"}\n` +
+      `─ 머리각 pitch: ${L.pitch ?? "-"}°`;
   }, 300);
 }
 els.points.textContent = `🪙 ${rewards.points}P`;
