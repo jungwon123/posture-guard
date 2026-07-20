@@ -583,6 +583,8 @@ function updateFaceCover(state, now, face) {
 }
 
 const KEYPT = { [LM.NOSE]: "#e6763c", [LM.EAR_L]: "#e6aa3c", [LM.EAR_R]: "#e6aa3c", [LM.SH_L]: "#5abe5a", [LM.SH_R]: "#5abe5a" };
+// 신호 이름 → 쉬운 한국어 (트래킹 막대 라벨)
+const SIGNAL_KR = { proximity: "화면 거리", pitch: "고개 숙임", head_drop: "머리 높이", shoulder_roll: "어깨 말림" };
 
 function drawTracking(state, zs) {
   const ctx = els.track.getContext("2d");
@@ -595,8 +597,8 @@ function drawTracking(state, zs) {
 
   const lms = lastResult?.landmarks?.[0];
   if (!lms) {
-    ctx.fillStyle = "#8b98a5"; ctx.font = "20px sans-serif"; ctx.textAlign = "center";
-    ctx.fillText("NO DETECTION", w / 2, h / 2);
+    ctx.fillStyle = "#8b98a5"; ctx.font = "18px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText("사람이 안 보여요", w / 2, h / 2);
     ctx.textAlign = "left";
     return;
   }
@@ -686,13 +688,15 @@ function drawTracking(state, zs) {
     ctx.fillStyle = warn ? "#e6aa3c" : "#e7ecf1"; ctx.fillText(val, 108, y);
   });
 
-  // ── z-score 신호 막대 (하단) ──
+  // ── 자세 신호 막대 (하단) — 쉬운 한국어 라벨 ──
   if (zs && Object.keys(zs).length) {
-    ctx.font = "12px monospace";
+    ctx.font = "13px sans-serif"; ctx.textAlign = "left";
     SIGNAL_KEYS.forEach((k, i) => {
       const y = h - 92 + i * 22, x0 = 168, bw = 150;
       ctx.fillStyle = "#e7ecf1";
-      ctx.fillText(`${k.padEnd(13)} z=${zs[k] >= 0 ? "+" : ""}${zs[k].toFixed(2)}`, 12, y + 4);
+      ctx.fillText(SIGNAL_KR[k] || k, 12, y + 4);
+      ctx.fillStyle = "#8b98a5";
+      ctx.fillText(`${zs[k] >= 0 ? "+" : ""}${zs[k].toFixed(1)}`, 112, y + 4);
       ctx.strokeStyle = "#3a444f"; ctx.strokeRect(x0, y - 8, bw, 14);
       const dz = x0 + (TUNING.DEADZONE_Z / 5) * bw;
       ctx.strokeStyle = "#8b98a5";
