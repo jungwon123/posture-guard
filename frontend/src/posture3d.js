@@ -155,3 +155,60 @@ export function absWorst(m, ref) {
   if (neck <= 0 && tilt <= 0) return null;
   return neck >= tilt ? "head_drop" : "shoulder_roll";
 }
+
+// ── 트래킹 고스트 가이드용 2D 기하 (판정과 무관, 렌더 전용) ──
+// 어깨 프레임: 원점=어깨중점, 기저 u=(오른어깨-왼어깨), v=u를 90° 회전. 점 P를 P=shMid+a·u+b·v 로 표현.
+// a,b 는 어깨너비 단위(무차원)라 카메라 거리/좌우이동/어깨 기울기에 불변 → 캘리브 때의 '바른 머리
+// 위치'를 라이브 어깨에 재투영해 고스트 가이드로 그린다. 정규화 좌표(x,y∈[0,1])에서 계산.
+const G = { NOSE: 0, EAR_L: 7, EAR_R: 8, SH_L: 11, SH_R: 12 };
+
+function toShoulderFrame(P, sL, sR) {
+  const ox = (sL.x + sR.x) / 2, oy = (sL.y + sR.y) / 2;
+  const ux = sR.x - sL.x, uy = sR.y - sL.y;   // 어깨 벡터
+  const vx = -uy, vy = ux;                     // 90° 회전(수직)
+  const det = ux * vy - uy * vx;               // = |u|^2
+  if (Math.abs(det) < 1e-9) return null;
+  const dx = P.x - ox, dy = P.y - oy;
+  return { a: (dx * vy - dy * vx) / det, b: (ux * dy - uy * dx) / det };
+}
+function fromShoulderFrame(ab, sL, sR) {
+  const ox = (sL.x + sR.x) / 2, oy = (sL.y + sR.y) / 2;
+  const ux = sR.x - sL.x, uy = sR.y - sL.y;
+  const vx = -uy, vy = ux;
+  return { x: ox + ab.a * ux + ab.b * vx, y: oy + ab.a * uy + ab.b * vy };
+}
+
+// 라이브 랜드마크 → 어깨 프레임 기준 머리 점들(귀중점·코·좌우귀). 미검출이면 null.
+export function extractGuidePoints(lms) {
+  for (const i of [G.NOSE, G.EAR_L, G.EAR_R, G.SH_L, G.SH_R]) {
+    if (!lms[i] || (lms[i].visibility ?? 1) < 0.5) return null;
+  }
+  const sL = lms[G.SH_L], sR = lms[G.SH_R];
+  const earMid = { x: (lms[G.EAR_L].x + lms[G.EAR_R].x) / 2, y: (lms[G.EAR_L].y + lms[G.EAR_R].y) / 2 };
+  const ear = toShoulderFrame(earMid, sL, sR);
+  const nose = toShoulderFrame(lms[G.NOSE], sL, sR);
+  const earL = toShoulderFrame(lms[G.EAR_L], sL, sR);
+  const earR = toShoulderFrame(lms[G.EAR_R], sL, sR);
+  if (!ear || !nose || !earL || !earR) return null;
+  return { ear, nose, earL, earR };
+}
+
+// 유도 캘리브 동안 모은 '바른 머리 위치'의 대푯값(어깨 프레임 좌표).
+export function finishGuide(samples) {
+  const g = samples.filter(Boolean);
+  if (g.length < 3) return null;
+  const med = (sel) => ({ a: median(g.map((s) => sel(s).a)), b: median(g.map((s) => sel(s).b)) });
+  return { ear: med((s) => s.ear), nose: med((s) => s.nose), earL: med((s) => s.earL), earR: med((s) => s.earR) };
+}
+
+// 저장된 가이드를 라이브 어깨에 재투영 → 그릴 정규화 점들(ear/nose/earL/earR). 어깨 미검출이면 null.
+export function projectGuide(guide, lms) {
+  if (!guide || !lms[G.SH_L] || !lms[G.SH_R]) return null;
+  const sL = lms[G.SH_L], sR = lms[G.SH_R];
+  return {
+    ear: fromShoulderFrame(guide.ear, sL, sR),
+    nose: fromShoulderFrame(guide.nose, sL, sR),
+    earL: fromShoulderFrame(guide.earL, sL, sR),
+    earR: fromShoulderFrame(guide.earR, sL, sR),
+  };
+}

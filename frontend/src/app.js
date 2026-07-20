@@ -5,7 +5,8 @@ import {
   StateMachine, finishCalibration, replay,
 } from "./core.js";
 // 3D 절대 지표 레이어 — 개인 z-score 위에 "거리에 강한 + 절대 바른자세" 게이트를 얹는다(core 무수정).
-import { AbsSmoother, extractAbsolute, finishAbsRef, absPenalty, absWorst, headPoseFromMatrix } from "./posture3d.js";
+import { AbsSmoother, extractAbsolute, finishAbsRef, absPenalty, absWorst, headPoseFromMatrix,
+  extractGuidePoints, finishGuide, projectGuide } from "./posture3d.js";
 import { Rewards, MELODIES, SKINS, THEMES, SHOP, TIERS, computeReport } from "./reward.js";
 
 // React 마운트 후 1회 실행 (엔진 계층 — 카메라 루프·판정·알림·PiP)
@@ -94,6 +95,9 @@ let calibUntil = null, calibSamples = [];
 let absSmoother = new AbsSmoother(); // 3D 지표 One-Euro
 let absRef = null;                   // 유도 캘리브로 잡은 "바른 자세" 절대 기준
 let absCalibSamples = [];            // 캘리브 중 절대 지표 수집
+let lastAbs = null;                  // 최근 절대 지표(트래킹 수치 표시용)
+let guideRef = null;                 // 트래킹 고스트 가이드(바른 머리위치, 어깨프레임)
+let guideCalibSamples = [];          // 캘리브 중 가이드 좌표 수집
 let escFired = false;
 let lastDetect = 0;
 let lastResult = null;
@@ -119,7 +123,7 @@ let faceSeenAt = 0;            // 마지막으로 얼굴이 잡힌 시각(초) �
 const FACE_HEAD_GAP = 180;     // 머리자세용 얼굴 추론 최소 간격(ms) ≈ 5.5Hz (폰 부담 완화)
 
 const profile = store.loadProfile();
-if (profile) { judge = new Judge(profile); sm.state = "GOOD"; absRef = profile.absRef || null; }
+if (profile) { judge = new Judge(profile); sm.state = "GOOD"; absRef = profile.absRef || null; guideRef = profile.guide || null; }
 
 // ── 알림 (소리·진동·노래는 reward.js 설정을 따름) ──
 // 화면 안 배너 — 아이폰(WebKit)처럼 Notification 미지원/미허용일 때의 대체 채널
@@ -419,7 +423,7 @@ function tick() {
   const minGap = document.hidden ? 950 : 100; // 보일 때 10Hz, 숨김 1Hz
   if (wallMs - lastDetect >= minGap && els.cam.readyState >= 2) {
     lastDetect = wallMs;
-    let sig = null, absM = null;
+    let sig = null, absM = null, guideSample = null;
     lastFaceFr = null; // pose detect가 throw해도 blink가 이전 틱 프레임을 재소비하지 않도록
     try {
       lastResult = landmarker.detectForVideo(els.cam, wallMs);
@@ -427,12 +431,14 @@ function tick() {
       if (lms) {
         const raw = extractSignals(lms);
         if (raw) sig = smoother.update(raw);
+        guideSample = extractGuidePoints(lms); // 트래킹 가이드 캡처용(어깨프레임 머리위치)
       }
       runFace(now, wallMs); // 얼굴 추론 1회(머리자세 + blink 공유) → faceHead 갱신
       // 3D 절대 지표(미터 world 좌표, 추가 추론비용 0) + 얼굴 머리 pitch(있으면). 없으면 null
       const raw3d = extractAbsolute(lastResult.worldLandmarks?.[0]);
       if (raw3d && faceHead) raw3d.headPitch = faceHead.pitch;
       absM = absSmoother.update(raw3d, now);
+      lastAbs = absM; // 트래킹 각도 수치 표시용
     } catch {}
 
     processBlink(now); // 눈 깜빡임 — runFace가 채운 lastFaceFr 소비 (켜져 있을 때만)
@@ -441,6 +447,7 @@ function tick() {
     if (calibUntil !== null) {
       if (sig) calibSamples.push(sig);
       if (absM) absCalibSamples.push(absM);
+      if (guideSample) guideCalibSamples.push(guideSample);
       const remain = calibUntil - now;
       els.msg.textContent = `바른자세 기준 등록 중… ${Math.max(0, remain).toFixed(1)}s — 귀·어깨 일직선, 화면은 눈높이, 등 펴기`;
       if (remain <= 0) {
@@ -448,8 +455,11 @@ function tick() {
           const p = finishCalibration(calibSamples);
           const ref = finishAbsRef(absCalibSamples); // 이 "바른 자세"의 3D 절대 기준
           if (ref) p.absRef = ref;
+          const g = finishGuide(guideCalibSamples); // 트래킹 고스트 가이드(바른 머리위치)
+          if (g) p.guide = g;
           store.saveProfile(p);
           absRef = ref;
+          guideRef = g;
           judge = new Judge(p);
           smoother = new SignalSmoother();
           absSmoother = new AbsSmoother();
@@ -462,6 +472,7 @@ function tick() {
         }
         calibUntil = null;
         absCalibSamples = [];
+        guideCalibSamples = [];
       }
     }
 
@@ -577,6 +588,11 @@ function drawTracking(state, zs) {
   const ctx = els.track.getContext("2d");
   const { width: w, height: h } = els.track;
   ctx.fillStyle = "#14181d"; ctx.fillRect(0, 0, w, h);
+  // 옅은 격자 — 각도·정렬을 눈으로 가늠하기 쉽게
+  ctx.strokeStyle = "rgba(255,255,255,0.045)"; ctx.lineWidth = 1;
+  for (let gx = 40; gx < w; gx += 40) { ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, h); ctx.stroke(); }
+  for (let gy = 40; gy < h; gy += 40) { ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(w, gy); ctx.stroke(); }
+
   const lms = lastResult?.landmarks?.[0];
   if (!lms) {
     ctx.fillStyle = "#8b98a5"; ctx.font = "20px sans-serif"; ctx.textAlign = "center";
@@ -584,23 +600,62 @@ function drawTracking(state, zs) {
     ctx.textAlign = "left";
     return;
   }
-  const px = (i) => [(1 - lms[i].x) * w, lms[i].y * h]; // 거울 반전 일치
-  ctx.strokeStyle = "#3a444f"; ctx.lineWidth = 1.5;
+  const px = (i) => [(1 - lms[i].x) * w, lms[i].y * h];        // 거울 반전 일치
+  const pp = (p) => [(1 - p.x) * w, p.y * h];                   // 정규화 점(가이드)용
+  const mid = (a, b) => [(px(a)[0] + px(b)[0]) / 2, (px(a)[1] + px(b)[1]) / 2];
+  const stateCol = state === "BAD" ? "#e64545" : state === "GOOD" ? "#5abe5a" : "#8b98a5";
+
+  // ── 바른자세 고스트 가이드 (라이브 스켈레톤 뒤에 먼저 그림) ──
+  let aligned = null;
+  if (guideRef) {
+    const gp = projectGuide(guideRef, lms);
+    if (gp && lms[7] && lms[8]) {
+      const gEar = pp(gp.ear), gEarL = pp(gp.earL), gEarR = pp(gp.earR);
+      const shMid = mid(LM.SH_L, LM.SH_R);
+      const liveEar = mid(LM.EAR_L, LM.EAR_R);
+      const off = Math.hypot(liveEar[0] - gEar[0], liveEar[1] - gEar[1]);
+      const headSpan = Math.hypot(gEarR[0] - gEarL[0], gEarR[1] - gEarL[1]);
+      aligned = off < Math.max(24, headSpan * 0.5);
+      const gcol = aligned ? "rgba(90,190,90,0.85)" : "rgba(230,170,60,0.9)";
+      ctx.save();
+      ctx.setLineDash([7, 6]); ctx.lineWidth = 2.5; ctx.strokeStyle = gcol;
+      ctx.beginPath(); ctx.moveTo(...gEarL); ctx.lineTo(...gEarR); ctx.stroke();      // 목표 귀선
+      const hr = headSpan * 0.62 + 14;
+      ctx.beginPath(); ctx.arc(gEar[0], gEar[1], hr, 0, 7); ctx.stroke();             // 목표 머리
+      ctx.beginPath(); ctx.moveTo(...gEar); ctx.lineTo(...shMid); ctx.stroke();       // 목표 목선
+      ctx.setLineDash([]);
+      ctx.fillStyle = gcol; ctx.font = "12px sans-serif"; ctx.textAlign = "center";
+      ctx.fillText("🎯 바른자세", gEar[0], gEar[1] - hr - 8);
+      ctx.textAlign = "left";
+      if (!aligned) { // 라이브 머리 → 목표로 유도선
+        ctx.strokeStyle = "rgba(230,170,60,0.55)"; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(...liveEar); ctx.lineTo(...gEar); ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
+
+  // ── 라이브 스켈레톤 (상반신 뼈대) ──
+  ctx.lineCap = "round";
+  ctx.strokeStyle = "#46525f"; ctx.lineWidth = 2.5;
   const bones = [[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24]];
   for (const [a, b] of bones) {
     if (!lms[a] || !lms[b]) continue;
     ctx.beginPath(); ctx.moveTo(...px(a)); ctx.lineTo(...px(b)); ctx.stroke();
   }
-  const mid = (a, b) => [(px(a)[0] + px(b)[0]) / 2, (px(a)[1] + px(b)[1]) / 2];
+  // 목선 = 상태색으로 강조 (거북목 판정의 핵심 축)
+  ctx.lineWidth = 3.5; ctx.strokeStyle = stateCol;
+  ctx.beginPath(); ctx.moveTo(...mid(LM.EAR_L, LM.EAR_R)); ctx.lineTo(...mid(LM.SH_L, LM.SH_R)); ctx.stroke();
   ctx.lineWidth = 2.5;
-  ctx.strokeStyle = "#e6aa3c";
-  ctx.beginPath(); ctx.moveTo(...px(LM.EAR_L)); ctx.lineTo(...px(LM.EAR_R)); ctx.stroke();
-  ctx.strokeStyle = "#5abe5a";
-  ctx.beginPath(); ctx.moveTo(...px(LM.SH_L)); ctx.lineTo(...px(LM.SH_R)); ctx.stroke();
-  ctx.strokeStyle = "#e6763c";
-  ctx.beginPath(); ctx.moveTo(...mid(LM.EAR_L, LM.EAR_R)); ctx.lineTo(...px(LM.NOSE)); ctx.stroke();
-  ctx.strokeStyle = "#9678c8"; ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.moveTo(...px(LM.NOSE)); ctx.lineTo(...mid(LM.SH_L, LM.SH_R)); ctx.stroke();
+  ctx.strokeStyle = "#5abe5a"; ctx.beginPath(); ctx.moveTo(...px(LM.SH_L)); ctx.lineTo(...px(LM.SH_R)); ctx.stroke();
+  ctx.strokeStyle = "#e6aa3c"; ctx.beginPath(); ctx.moveTo(...px(LM.EAR_L)); ctx.lineTo(...px(LM.EAR_R)); ctx.stroke();
+  // 얼굴 디테일 — 눈(2,5)·입(9-10)·코 로 머리 방향이 보이게
+  ctx.fillStyle = "#cdd6df";
+  for (const i of [2, 5]) if (lms[i]) { const [x, y] = px(i); ctx.beginPath(); ctx.arc(x, y, 2.6, 0, 7); ctx.fill(); }
+  if (lms[9] && lms[10]) { ctx.strokeStyle = "#cdd6df"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(...px(9)); ctx.lineTo(...px(10)); ctx.stroke(); }
+  // 코 → 머리방향 힌트(짧은 선)
+  if (lms[0]) { ctx.strokeStyle = "#e6763c"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(...mid(LM.EAR_L, LM.EAR_R)); ctx.lineTo(...px(LM.NOSE)); ctx.stroke(); }
+  // 키포인트
   for (const [i, c] of Object.entries(KEYPT)) {
     const [x, y] = px(+i);
     ctx.fillStyle = c; ctx.beginPath(); ctx.arc(x, y, 5, 0, 7); ctx.fill();
@@ -609,10 +664,34 @@ function drawTracking(state, zs) {
       ctx.beginPath(); ctx.arc(x, y, 9, 0, 7); ctx.stroke();
     }
   }
+  // 문제 부위 펄스 링 (BAD일 때 worst 신호 위치)
+  const worst = window.__pgLive?.worst;
+  if (worst && state === "BAD") {
+    const pr = 13 + 4 * Math.sin(performance.now() / 160);
+    ctx.strokeStyle = "#e64545"; ctx.lineWidth = 2;
+    for (const t of (worst === "shoulder_roll" ? [LM.SH_L, LM.SH_R] : [LM.EAR_L, LM.EAR_R])) {
+      const [x, y] = px(t); ctx.beginPath(); ctx.arc(x, y, pr, 0, 7); ctx.stroke();
+    }
+  }
+
+  // ── 각도·정렬 수치 (우상단) ──
+  const readout = [];
+  if (lastAbs?.shoulderTilt != null) readout.push(["어깨 수평도", `${lastAbs.shoulderTilt.toFixed(0)}°`, lastAbs.shoulderTilt > 12]);
+  if (lastAbs?.headPitch != null) readout.push(["머리 각도", `${lastAbs.headPitch >= 0 ? "+" : ""}${lastAbs.headPitch.toFixed(0)}°`, false]);
+  if (guideRef && aligned != null) readout.push(["머리 정렬", aligned ? "좋음 ✓" : "숙임/거북목", !aligned]);
+  ctx.font = "13px sans-serif"; ctx.textAlign = "right";
+  readout.forEach(([label, val, warn], i) => {
+    const y = 24 + i * 21;
+    ctx.fillStyle = "#8b98a5"; ctx.fillText(label, w - 78, y);
+    ctx.fillStyle = warn ? "#e6aa3c" : "#e7ecf1"; ctx.fillText(val, w - 12, y);
+  });
+  ctx.textAlign = "left";
+
+  // ── z-score 신호 막대 (하단) ──
   if (zs && Object.keys(zs).length) {
     ctx.font = "12px monospace";
     SIGNAL_KEYS.forEach((k, i) => {
-      const y = 28 + i * 24, x0 = 170, bw = 160;
+      const y = h - 92 + i * 22, x0 = 168, bw = 150;
       ctx.fillStyle = "#e7ecf1";
       ctx.fillText(`${k.padEnd(13)} z=${zs[k] >= 0 ? "+" : ""}${zs[k].toFixed(2)}`, 12, y + 4);
       ctx.strokeStyle = "#3a444f"; ctx.strokeRect(x0, y - 8, bw, 14);
@@ -625,7 +704,7 @@ function drawTracking(state, zs) {
     });
   } else if (!judge) {
     ctx.fillStyle = "#8b98a5"; ctx.font = "13px sans-serif";
-    ctx.fillText("[기준 등록]을 하면 신호가 표시됩니다", 12, 30);
+    ctx.fillText("[바른자세 기준 등록]을 하면 신호와 가이드가 표시됩니다", 12, h - 20);
   }
 }
 
@@ -1151,7 +1230,7 @@ els.replayInput.onchange = async () => {
 els.btnStart.onclick = () => { if (running) stop(); else start(); };
 els.btnCalib.onclick = () => {
   calibUntil = nowSec() + TUNING.CALIB_SECS;
-  calibSamples = []; absCalibSamples = []; absSmoother = new AbsSmoother();
+  calibSamples = []; absCalibSamples = []; guideCalibSamples = []; absSmoother = new AbsSmoother();
   speak("바르게! 귀·어깨 일직선, 화면 눈높이 🧘");
 };
 els.btnNotify.onclick = async () => {
