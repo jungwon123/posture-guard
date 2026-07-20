@@ -2,7 +2,7 @@
 // 판정 로직은 core.js, 보상·알림설정 규칙은 reward.js (docs/기능-v2.md 참고).
 import {
   TUNING, SIGNAL_KEYS, LM, extractSignals, SignalSmoother, Judge,
-  StateMachine, finishCalibration, replay,
+  StateMachine, finishCalibration,
 } from "./core.js";
 // 3D 절대 지표 레이어 — 개인 z-score 위에 "거리에 강한 + 절대 바른자세" 게이트를 얹는다(core 무수정).
 import { AbsSmoother, extractAbsolute, finishAbsRef, absPenalty, absWorst, headPoseFromMatrix,
@@ -25,7 +25,6 @@ const els = {
   btnFace: $("btn-face"), fcImg: $("fc-img"), fcEmoji: $("fc-emoji"),
   reportTable: $("report-table"), reportGrade: $("report-grade"),
   miniCanvas: $("mini-canvas"), miniVideo: $("mini-video"),
-  replayLink: $("replay-link"), replayInput: $("replay-input"),
   setMode: $("set-mode"), setMelody: $("set-melody"), setVolume: $("set-volume"),
   setVibrate: $("set-vibrate"), setCustom: $("set-custom"),
   btnSong: $("btn-song"), songFile: $("song-file"), songName: $("song-name"),
@@ -1267,18 +1266,6 @@ renderGroupSwitcher();  // 로컬 목록으로 즉시 칩 표시
 refreshLeaderboard();   // 그룹 페이지는 기본 열림 — 첫 로드 시 표시
 reconcileGroups();      // 서버 목록과 동기화(비동기)
 setInterval(() => { if ($("group").open) refreshLeaderboard(); }, 30_000); // 상태 점 주기 갱신
-
-// ── 리플레이 검증 ──
-els.replayLink.onclick = () => els.replayInput.click();
-els.replayInput.onchange = async () => {
-  const f = els.replayInput.files[0];
-  if (!f) return;
-  const data = JSON.parse(await f.text());
-  const t0 = data.frames[0].t;
-  const lines = replay(data).map(([t, a, b]) => `t=${(t - t0).toFixed(1)}s ${a}→${b}`);
-  els.msg.textContent = `리플레이 ${data.frames.length}프레임: ` +
-    (lines.length ? lines.join(" · ") : "(전이 없음)");
-};
 
 // ── 버튼 ──
 els.btnStart.onclick = () => { if (running) stop(); else start(); };

@@ -11,8 +11,6 @@ export default function Header() {
       <span id="points">🪙 0P</span>
       <span id="blink" style={{ display: "none" }}>👁 --</span>
       <button id="theme-toggle" title="배경 밝게/어둡게">🌙</button>
-      <a className="tool" id="replay-link">리플레이 검증(JSON)</a>
-      <input type="file" id="replay-input" accept=".json" />
     </header>
   );
 }
