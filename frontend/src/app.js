@@ -1294,6 +1294,13 @@ applyMode(localStorage.getItem("pg_mode") || "dark");
 if (themeBtn) themeBtn.onclick = () =>
   applyMode(document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light");
 
+// 그룹 그리드에서 친구가 "자세 콕!"을 보내면(LiveKit 데이터) 알림음·진동·요정 반응
+window.addEventListener("pg-nudge", (e) => {
+  const from = e?.detail?.from || "친구";
+  notify(`🔔 ${from}님이 자세 교정하라고 콕! 찔렀어요 — 허리 펴요!`);
+  speak("허리 펴라고 콕! 😤");
+});
+
 // ── 홈 화면 설치 안내 ──
 // 완전 자동 설치는 어떤 브라우저도 불가(악용 방지). 안드로이드/데스크톱은 네이티브 설치 프롬프트,
 // 아이폰은 JS 트리거 불가라 안내 배너만 표시. 이미 설치했거나 닫았으면 안 띄운다.
