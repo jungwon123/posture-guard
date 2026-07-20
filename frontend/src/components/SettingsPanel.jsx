@@ -1,4 +1,4 @@
-// 알림 설정 — 방식·알림음·내 노래·음량·진동 횟수. select 옵션은 엔진이 채운다.
+// 알림 설정 — 방식·알림음·음량·진동 횟수. select 옵션은 엔진이 채운다.
 export default function SettingsPanel() {
   return (
     <details id="settings">
@@ -16,12 +16,6 @@ export default function SettingsPanel() {
       <div className="row">
         <label>알림음</label>
         <select id="set-melody"></select>
-        <label style={{ minWidth: "auto" }}>
-          <input type="checkbox" id="set-custom" /> 내 노래 사용
-        </label>
-        <button id="btn-song">노래 파일 선택</button>
-        <input type="file" id="song-file" accept="audio/*" />
-        <span className="hint" id="song-name"></span>
       </div>
       <div className="row">
         <label>음량</label>
@@ -33,7 +27,6 @@ export default function SettingsPanel() {
           <option value="3">3회</option>
         </select>
       </div>
-      <div className="hint">노래는 2MB 이하 오디오 파일 — 브라우저 안에만 저장됩니다 (서버 업로드 없음).</div>
     </details>
   );
 }

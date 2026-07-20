@@ -26,8 +26,7 @@ const els = {
   reportTable: $("report-table"), reportGrade: $("report-grade"),
   miniCanvas: $("mini-canvas"), miniVideo: $("mini-video"),
   setMode: $("set-mode"), setMelody: $("set-melody"), setVolume: $("set-volume"),
-  setVibrate: $("set-vibrate"), setCustom: $("set-custom"),
-  btnSong: $("btn-song"), songFile: $("song-file"), songName: $("song-name"),
+  setVibrate: $("set-vibrate"),
   btnTest: $("btn-test"), shopList: $("shop-list"),
   blink: $("blink"), setBlink: $("set-blink"), blinkStatus: $("blink-status"),
 };
@@ -176,25 +175,13 @@ function playNotes(notes, volume) {
     }
   } catch {}
 }
-let customAudio = null;
 function playAlert(stage, body) { // stage 1=BAD 진입, 2=에스컬레이션. body는 아이폰 재알림용 배너 문구
   const s = rewards.settings;
   const useSound = s.mode === "sound" || s.mode === "both";
   const useVib = s.mode === "vibrate" || s.mode === "both";
   if (useSound) {
-    const custom = s.useCustom && localStorage.getItem("pg_custom_audio");
-    if (custom) {
-      try {
-        customAudio = customAudio || new Audio(custom);
-        customAudio.volume = s.volume;
-        customAudio.currentTime = 0;
-        customAudio.play().catch(() => {});
-        if (stage === 1) setTimeout(() => customAudio.pause(), 8000); // 1단계는 8초까지만
-      } catch {}
-    } else {
-      const notes = (MELODIES[s.melody] || MELODIES.dingdong).notes;
-      playNotes(stage === 2 ? [...notes, [0, 0.15], ...notes] : notes, s.volume);
-    }
+    const notes = (MELODIES[s.melody] || MELODIES.dingdong).notes;
+    playNotes(stage === 2 ? [...notes, [0, 0.15], ...notes] : notes, s.volume);
   }
   if (useVib) {
     // 세기 제어는 웹에서 불가 → 횟수로 통일. 2단계(에스컬레이션)는 2배, 최대 5회.
@@ -860,25 +847,21 @@ function initSettings() {
   els.setVolume.value = Math.round(s.volume * 100);
   const vmap = { weak: "1", mid: "2", strong: "3" }; // 구버전(세기) 설정 마이그레이션
   els.setVibrate.value = vmap[s.vibrate] || s.vibrate;
-  els.setCustom.checked = s.useCustom;
   if (!navigator.vibrate) { // 아이폰(WebKit): 진동 API 없음 — 알림 재발송으로 횟수 유도
     const hint = document.createElement("div");
     hint.className = "hint";
     hint.textContent = "※ 아이폰은 알림을 횟수만큼 다시 울려 진동을 만들어요 (1.5초 간격, 설치형 웹앱에서 동작).";
     els.setVibrate.closest("details").appendChild(hint);
   }
-  updateSongName();
 
   const save = () => {
     rewards.settings = {
       mode: els.setMode.value, melody: els.setMelody.value,
       volume: els.setVolume.value / 100, vibrate: els.setVibrate.value,
-      useCustom: els.setCustom.checked,
     };
     rewards._save();
-    customAudio = null; // 음량 변경 반영
   };
-  for (const el of [els.setMode, els.setMelody, els.setVolume, els.setVibrate, els.setCustom]) {
+  for (const el of [els.setMode, els.setMelody, els.setVolume, els.setVibrate]) {
     el.addEventListener("change", save);
   }
   els.setMelody.addEventListener("change", () => playNotes(MELODIES[els.setMelody.value].notes, rewards.settings.volume));
@@ -886,31 +869,6 @@ function initSettings() {
     const m = `${rewards.fairy("BAD", 0, false)} 알림 테스트예요`;
     notify(m); playAlert(1, m);
   };
-
-  els.btnSong.onclick = () => els.songFile.click();
-  els.songFile.onchange = async () => {
-    const f = els.songFile.files[0];
-    if (!f) return;
-    if (f.size > 2 * 1024 * 1024) { els.msg.textContent = "노래 파일은 2MB 이하만 가능해요."; return; }
-    const dataUrl = await new Promise((res, rej) => {
-      const r = new FileReader();
-      r.onload = () => res(r.result); r.onerror = rej;
-      r.readAsDataURL(f);
-    });
-    try {
-      localStorage.setItem("pg_custom_audio", dataUrl);
-      localStorage.setItem("pg_custom_audio_name", f.name);
-      els.setCustom.checked = true;
-      save(); customAudio = null;
-      updateSongName();
-      els.msg.textContent = `"${f.name}" 등록 완료 — 알림 테스트로 확인해보세요.`;
-    } catch {
-      els.msg.textContent = "저장 공간이 부족해요. 더 작은 파일로 시도해주세요.";
-    }
-  };
-}
-function updateSongName() {
-  els.songName.textContent = localStorage.getItem("pg_custom_audio_name") || "(선택된 노래 없음)";
 }
 
 // ── 상점 UI ──

@@ -57,7 +57,6 @@ export const DEFAULT_SETTINGS = {
   melody: "dingdong",
   volume: 0.7,          // 0~1
   vibrate: "2",         // 진동 횟수 "1" | "2" | "3" (강도 제어는 웹에서 불가 — 횟수로 통일)
-  useCustom: false,     // 업로드한 노래 사용
 };
 
 const GOOD_SEC_PER_POINT = 60;
