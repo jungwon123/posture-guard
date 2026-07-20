@@ -13,6 +13,8 @@ const PROBLEM = {
   proximity:     { anim: "hurt_neck", msgs: ["화면에 너무 가까워요! 조금만 뒤로 🙈", "눈 아파요~ 화면과 거리를 둬요"] },
   pitch:         { anim: "hurt_neck", msgs: ["고개가 푹 숙여졌어요! 살짝 들어요 ⬆️", "화면을 눈높이로 올려볼까요?"] },
   shoulder_roll: { anim: "hurt_back", msgs: ["등이 굽었어요! 가슴을 쫙 펴요 🌟", "어깨가 말렸어요~ 활짝 펴봐요"] },
+  head_tilt:     { anim: "hurt_neck", msgs: ["고개가 갸웃 기울었어요! 수평 맞춰요 ⚖️", "머리가 한쪽으로 쏠렸어요~ 가운데로 🙂"] },
+  hand_face:     { anim: "hurt_neck", msgs: ["손으로 턱 괴지 마요~ 목이 비뚤어져요 ✋", "얼굴 괴면 척추가 울어요! 손 내려요"] },
 };
 const PRAISE = ["자세 완벽해요! ✨", "좋아요, 이대로! 💚", "허리 곧게 잘 폈어요 👍", "최고예요 🥰"];
 const TIPS = ["바른 자세, 잊지 말아요~", "가끔 어깨도 쭉 펴줘요 🙆", "물 한 모금 마셔요 💧"];

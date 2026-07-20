@@ -442,7 +442,7 @@ function tick() {
       runFace(now, wallMs); // 얼굴 추론 1회(머리자세 + blink 공유) → faceHead 갱신
       // 3D 절대 지표(미터 world 좌표, 추가 추론비용 0) + 얼굴 머리 pitch(있으면). 없으면 null
       const raw3d = extractAbsolute(lastResult.worldLandmarks?.[0]);
-      if (raw3d && faceHead) raw3d.headPitch = faceHead.pitch;
+      if (raw3d && faceHead) { raw3d.headPitch = faceHead.pitch; raw3d.headRoll = faceHead.roll; }
       absM = absSmoother.update(raw3d, now);
       lastAbs = absM; // 트래킹 각도 수치 표시용
     } catch {}
@@ -511,7 +511,13 @@ function tick() {
       tiltRef: absRef?.shoulderTilt != null ? +absRef.shoulderTilt.toFixed(1) : null,
       // 어깨 말림(3D span)
       span: absM?.shoulderSpan != null ? +absM.shoulderSpan.toFixed(3) : null,
-      spanRef: absRef?.shoulderSpan != null ? +absRef.shoulderSpan.toFixed(3) : null };
+      spanRef: absRef?.shoulderSpan != null ? +absRef.shoulderSpan.toFixed(3) : null,
+      // 좌우 쏠림 · 갸웃 · 턱괴기
+      lat: absM?.headLateral != null ? +absM.headLateral.toFixed(3) : null,
+      latRef: absRef?.headLateral != null ? +absRef.headLateral.toFixed(3) : null,
+      roll: absM?.headRoll != null ? +absM.headRoll.toFixed(1) : null,
+      rollRef: absRef?.headRoll != null ? +absRef.headRoll.toFixed(1) : null,
+      hand: absM?.handToFace != null ? +absM.handToFace.toFixed(2) : null };
 
     if (state !== prev) {
       logTransition(prev, state, now);
@@ -1315,6 +1321,9 @@ if (new URLSearchParams(location.search).has("fwd")) {
       `─ 거북목 fwd: ${L.fwd ?? "-"} / 기준 ${L.fwdRef ?? "-"} · Δ ${dev ?? "-"} ${fwdBad ? "⚠️" : ""}\n` +
       `─ 어깨기울 : ${L.tilt ?? "-"}° / 기준 ${L.tiltRef ?? "-"}° ${tiltBad ? "⚠️감점" : "(기준+3°~)"}\n` +
       `─ 어깨말림 : ${L.span ?? "-"} / 기준 ${L.spanRef ?? "-"} · 축소 ${spanDrop != null ? (spanDrop * 100).toFixed(0) + "%" : "-"} ${spanBad ? "⚠️감점" : "(6%~)"}\n` +
+      `─ 좌우쏠림 : ${L.lat ?? "-"} / 기준 ${L.latRef ?? "-"} ${(L.lat != null && L.latRef != null && Math.abs(L.lat - L.latRef) > 0.12) ? "⚠️감점" : "(±0.12~)"}\n` +
+      `─ 갸웃 roll: ${L.roll ?? "-"}° / 기준 ${L.rollRef ?? "-"}° ${(L.roll != null && L.rollRef != null && Math.abs(L.roll - L.rollRef) > 10) ? "⚠️감점" : "(±10°~)"}\n` +
+      `─ 턱괴기 hand: ${L.hand ?? "-"} ${(L.hand != null && L.hand < 0.65) ? "⚠️감점" : "(<0.65)"}\n` +
       `─ 머리각 pitch: ${L.pitch ?? "-"}°`;
   }, 300);
 }
