@@ -7,7 +7,9 @@ export const TUNING = {
   CALIB_SECS: 5.0,
   SIGMA_FLOOR_FRAC: 0.04,
   DEADZONE_Z: 1.0,
-  WEIGHTS: { proximity: 0.35, pitch: 0.30, head_drop: 0.25, shoulder_roll: 0.10 },
+  // v2 재정의: head_drop(머리 높이, 코 기반) 폐기 — pitch와 이중계산이라 headVertical(절대게이트)로 대체.
+  // 남은 3신호를 합=1로 재정규화(기존 0.35/0.30/0.10 ÷ 0.75).
+  WEIGHTS: { proximity: 0.47, pitch: 0.40, shoulder_roll: 0.13 },
   SCORE_K: 1.0,
   BAD_ENTER_SCORE: 60,
   BAD_ENTER_SUSTAIN: 5.0,
@@ -18,7 +20,7 @@ export const TUNING = {
   ESCALATE_VIGNETTE: 60.0,
 };
 
-export const BAD_DIRECTION = { proximity: +1, pitch: +1, head_drop: -1, shoulder_roll: -1 };
+export const BAD_DIRECTION = { proximity: +1, pitch: +1, shoulder_roll: -1 };
 export const SIGNAL_KEYS = Object.keys(TUNING.WEIGHTS);
 
 // MediaPipe Pose 랜드마크 인덱스 (tasks-vision 도 동일한 33-포인트 토폴로지)

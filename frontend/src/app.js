@@ -594,7 +594,7 @@ function updateFaceCover(state, now, face) {
 
 const KEYPT = { [LM.NOSE]: "#e6763c", [LM.EAR_L]: "#e6aa3c", [LM.EAR_R]: "#e6aa3c", [LM.SH_L]: "#5abe5a", [LM.SH_R]: "#5abe5a" };
 // 신호 이름 → 쉬운 한국어 (트래킹 막대 라벨)
-const SIGNAL_KR = { proximity: "화면 거리", pitch: "고개 숙임", head_drop: "머리 높이", shoulder_roll: "어깨 말림" };
+const SIGNAL_KR = { proximity: "화면 거리", pitch: "고개 숙임", shoulder_roll: "어깨 말림" };
 
 function drawTracking(state, zs) {
   const ctx = els.track.getContext("2d");
