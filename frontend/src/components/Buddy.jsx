@@ -20,7 +20,8 @@ const pick = (a) => a[Math.floor(Math.random() * a.length)];
 
 export default function Buddy() {
   const [hidden, setHidden] = useState(() => localStorage.getItem("pg_buddy_off") === "1");
-  const [pos, setPos] = useState({ left: 60, top: 120 });
+  // 초기 위치도 폰 컬럼(PC=중앙 430px, 모바일=전체) 안으로 잡아 마운트 직후 깜빡임 방지
+  const [pos, setPos] = useState(() => ({ left: Math.max(0, (window.innerWidth - 430) / 2) + 56, top: 120 }));
   const [anim, setAnim] = useState("idle");
   const [dir, setDir] = useState(skinDir);
   const R = useRef({ state: null, worst: null, lastSpeak: 0, lastMove: 0, bubbleUntil: 0 });
@@ -46,14 +47,18 @@ export default function Buddy() {
     const hideBubble = () => { wrap.style.display = "none"; };
     const setBoth = (p) => { cur = p; setPos(p); if (wrap.style.display !== "none") placeBubble(); R.current.lastMove = performance.now(); };
 
-    const perches = () => { const w = innerWidth, h = innerHeight; return [
-      { left: 56, top: 118 }, { left: w - B - 56, top: 118 },
-      { left: 56, top: Math.round(h * 0.4) }, { left: w - B - 56, top: Math.round(h * 0.4) },
-      { left: 56, top: h - 250 }, { left: w - B - 56, top: h - 250 },
+    // PC에서는 앱이 폰 폭(430px) 중앙 컬럼으로 보이므로, 도우미도 그 컬럼 안에서만 로밍
+    const FRAME = 430;
+    const fx = () => Math.max(0, (innerWidth - FRAME) / 2); // 폰 컬럼 왼쪽 오프셋(모바일=0)
+    const fw = () => Math.min(innerWidth, FRAME);           // 폰 컬럼 폭(모바일=innerWidth)
+    const perches = () => { const x0 = fx(), w = fw(), h = innerHeight; return [
+      { left: x0 + 56, top: 118 }, { left: x0 + w - B - 56, top: 118 },
+      { left: x0 + 56, top: Math.round(h * 0.4) }, { left: x0 + w - B - 56, top: Math.round(h * 0.4) },
+      { left: x0 + 56, top: h - 250 }, { left: x0 + w - B - 56, top: h - 250 },
     ]; };
     const roam = () => setBoth(perches()[Math.floor(Math.random() * 6)]);
     // 말할 때 서는 '무대' — 카메라 <video> 위에 말풍선이 가려지므로(비디오 오버레이) 비디오 없는 하단 중앙으로
-    const stageSpot = () => setBoth({ left: Math.round(innerWidth / 2 - B / 2), top: Math.max(120, innerHeight - 240) });
+    const stageSpot = () => setBoth({ left: Math.round(fx() + fw() / 2 - B / 2), top: Math.max(120, innerHeight - 240) });
     const say = (t, ms = 4600) => { stageSpot(); showBubble(t); R.current.bubbleUntil = performance.now() + ms; R.current.lastSpeak = performance.now(); };
 
     roam();
