@@ -266,10 +266,6 @@
   transform: scale(1.12) translateY(-1px);
 }
 #bottom-nav button:active .nav-ic { transform: scale(.94); }
-/* 설정 탭 이모지 아이콘 — 이미지 아이콘과 같은 슬롯 크기 */
-.nav-ic-emoji { width: 30px; height: 30px; font-size: 23px; line-height: 30px; text-align: center;
-  filter: opacity(.72); transition: transform .15s, filter .15s; }
-#bottom-nav button.on .nav-ic-emoji { filter: none; transform: scale(1.12) translateY(-1px); }
 #report-overlay { z-index: 60; }
 #install-banner { bottom: 76px; }
 

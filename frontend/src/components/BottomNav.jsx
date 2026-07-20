@@ -5,7 +5,7 @@ const TABS = [
   { id: "group", img: "/assets/ui/nav-group.png", label: "그룹" },
   { id: "shop", img: "/assets/ui/nav-shop.png", label: "상점" },
   { id: "character", img: "/assets/ui/nav-character.png", label: "캐릭터" },
-  { id: "settings", emoji: "⚙️", label: "설정" }, // 로그인 탭 자리 → 설정(알림·눈깜빡임)
+  { id: "settings", img: "/assets/ui/nav-login.png", label: "설정" }, // 로그인 탭 자리 → 설정(아이콘=기존 열쇠 유지)
 ];
 
 export default function BottomNav({ page, onChange }) {
@@ -13,9 +13,7 @@ export default function BottomNav({ page, onChange }) {
     <nav id="bottom-nav">
       {TABS.map((t) => (
         <button key={t.id} className={page === t.id ? "on" : ""} onClick={() => onChange(t.id)}>
-          {t.emoji
-            ? <span className="nav-ic nav-ic-emoji" aria-hidden="true">{t.emoji}</span>
-            : <img className="nav-ic" src={t.img} alt="" aria-hidden="true" />}
+          <img className="nav-ic" src={t.img} alt="" aria-hidden="true" />
           {t.label}
         </button>
       ))}
