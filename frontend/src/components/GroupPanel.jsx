@@ -2,9 +2,9 @@
 export default function GroupPanel() {
   return (
     <>
-    <img className="page-banner sq" src="/assets/ui/group.png" alt="그룹" />
+    <img className="page-banner sq" src="/assets/ui/group.png" alt="함께 공부" />
     <details id="group" open>
-      <summary>우리 그룹</summary>
+      <summary>함께 공부하는 방</summary>
 
       {/* 내가 속한 방 목록 (app.js가 렌더) */}
       <div id="group-switcher" className="group-switcher"></div>

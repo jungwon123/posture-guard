@@ -9,8 +9,7 @@ import SettingsPanel from "./components/SettingsPanel.jsx";
 import EyeCarePanel from "./components/EyeCarePanel.jsx";
 import GroupPanel from "./components/GroupPanel.jsx";
 import GroupGrid from "./components/GroupGrid.jsx";
-import ShopPage from "./components/ShopPage.jsx";
-import CharacterPage from "./components/CharacterPage.jsx";
+import DressUpPage from "./components/DressUpPage.jsx";
 import LoginPage from "./components/LoginPage.jsx";
 import ReportOverlay from "./components/ReportOverlay.jsx";
 import InstallBanner from "./components/InstallBanner.jsx";
@@ -38,6 +37,11 @@ export default function App() {
         <StudyTimer />
         <MainPanels />
         <Controls />
+        <button className="together-cta" onClick={() => setPage("group")}>
+          <span className="tc-emoji">👥</span>
+          <span className="tc-body"><b>함께 공부</b><span>친구들과 같이 집중해요</span></span>
+          <span className="tc-arrow">›</span>
+        </button>
         <AttendanceCard />
         <button id="fab-stats" title="차트·기록 보기" aria-label="통계 보기" onClick={() => setShowStats(true)}>📊 통계</button>
       </div>
@@ -47,12 +51,8 @@ export default function App() {
         <GroupGrid />
       </div>
 
-      <div className="page" style={show("shop")}>
-        <ShopPage />
-      </div>
-
-      <div className="page" style={show("character")}>
-        <CharacterPage />
+      <div className="page" style={show("dressup")}>
+        <DressUpPage />
       </div>
 
       {/* 설정 페이지 — 하단 '설정' 탭. 출석·알림·눈깜빡임 설정을 여기로 모음 */}
