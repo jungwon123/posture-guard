@@ -386,6 +386,13 @@
 .login-start img { position: relative; z-index: 1; width: min(300px, 82%); filter: drop-shadow(0 6px 18px rgba(12, 16, 24,.4)); transition: transform .15s; }
 .login-start:hover img { transform: scale(1.03); }
 .login-start:active img { transform: scale(.97); }
+/* 정체성 태그라인 + 3기둥 (시작화면) */
+.login-tagline { font-size: 15px; font-weight: 800; letter-spacing: -.02em; color: var(--text); margin: 2px 0 12px; }
+.login-pillars { display: flex; justify-content: center; gap: 8px; margin: 0 0 6px; }
+.login-pillars span { display: flex; flex-direction: column; align-items: center; gap: 3px;
+  font-size: 11.5px; color: var(--dim); font-weight: 700; background: var(--bg);
+  border: 1px solid var(--line); border-radius: 12px; padding: 8px 6px; flex: 1; }
+.login-pillars b { font-size: 18px; }
 .login-more { margin-top: 8px; text-align: left; }
 .login-more summary { cursor: pointer; }
 

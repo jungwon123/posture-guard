@@ -987,9 +987,9 @@ function openReport() {
   const todayEarned = rewards.today.date === dateStr() ? rewards.today.earned : 0;
   const bt = blinkTodayStats();
   const rows = [
-    ["총 감시 시간", fmtMin(rep.watched)],
+    ["오늘 공부 시간", fmtMin(rep.watched)],
     ["바른 자세", `${fmtMin(rep.good)}${rep.ratio !== null ? ` (${Math.round(rep.ratio * 100)}%)` : ""}`],
-    ["나쁜 자세", `${fmtMin(rep.bad)} · ${rep.badCount}회`],
+    ["거북목 위험 자세", `${fmtMin(rep.bad)} · ${rep.badCount}회`],
     ["최장 연속 바른 자세", fmtMin(rep.longestGood)],
   ];
   if (blinkEnabled || bt.n) // 눈 깜빡임: 오늘 평균(분당). 정상 15~20

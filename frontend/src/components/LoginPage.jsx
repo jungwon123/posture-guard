@@ -3,13 +3,18 @@ export default function LoginPage({ onGuest }) {
   return (
     <div className="card login-card login-hero">
       <h2>척추요정과 함께 시작해요</h2>
-      <p className="hint">
-        지금은 로그인 없이 바로 쓸 수 있어요. 계정 기능이 열리면 기기를 바꿔도
-        포인트와 기록이 이어집니다.
-      </p>
+      <p className="login-tagline">함께 공부하고, 자세는 요정이 지켜줘요</p>
+      <div className="login-pillars">
+        <span><b>👀</b>공부 감시</span>
+        <span><b>🧚</b>자세 교정</span>
+        <span><b>👥</b>함께 열품타</span>
+      </div>
       <button type="button" className="login-start" onClick={onGuest} aria-label="시작하기">
         <img src="/assets/ui/start.png" alt="시작하기" />
       </button>
+      <p className="hint">
+        로그인 없이 바로 쓸 수 있어요. 계정 기능이 열리면 기기를 바꿔도 포인트·기록이 이어집니다.
+      </p>
 
       <details className="login-more">
         <summary className="hint">로그인 (준비 중)</summary>
