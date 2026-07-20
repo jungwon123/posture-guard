@@ -16,14 +16,16 @@ const IDX = { NOSE: 0, EAR_L: 7, EAR_R: 8, SH_L: 11, SH_R: 12 };
 const MIN_VIS = 0.5;
 
 // 절대 페널티 가중치 — core z-score 점수에 exp(-penalty)로 곱해 결합한다(0이면 무영향).
-const ABS_W = { head: 1.6, tilt: 1.2, pitch: 1.0, forward: 1.2 }; // tilt↑(0.6→1.2): 어깨 기울기 반응성 강화
+const ABS_W = { head: 1.6, tilt: 1.4, pitch: 1.0, forward: 1.2, span: 1.4 }; // tilt↑, span=어깨말림(3D)
 const HEAD_DROP_DEADZONE = 0.15; // 기준 대비 15% 이상 내려가야 페널티 시작
-const TILT_MARGIN_DEG = 5;       // 기준 + 5도 초과부터 페널티(8→5, 더 민감)
-const TILT_FULL_DEG = 18;        // 18도 초과분에서 가중치 최대(30→18: 현실적 기울기서 확실히 감점)
+const TILT_MARGIN_DEG = 3;       // 기준 + 3도 초과부터 페널티(더 타이트)
+const TILT_FULL_DEG = 14;        // 14도 초과분에서 가중치 최대
 const PITCH_MARGIN_DEG = 15;     // 머리 각도가 기준에서 15도 이상 벗어나야 페널티(양방향, 여유 넉넉)
 const PITCH_FULL_DEG = 35;       // 35도 초과분에서 가중치 최대
 const FORWARD_MARGIN = 0.10;     // 기준 대비 정규화 0.10 이상 '앞으로' 나와야 페널티(Z 노이즈 여유)
 const FORWARD_FULL = 0.30;       // +0.30 초과분에서 가중치 최대
+const SPAN_DEADZONE = 0.06;      // 어깨너비/귀간격(3D)이 기준보다 6% 이상 줄어야 페널티(말림)
+const SPAN_FULL = 0.15;          // 15% 축소분에서 가중치 최대
 
 // ── One-Euro 필터 (지터는 줄이고 지연은 최소) ──
 class LowPass {
@@ -55,7 +57,8 @@ export function extractAbsolute(wlms) {
   }
   const eL = wlms[IDX.EAR_L], eR = wlms[IDX.EAR_R], sL = wlms[IDX.SH_L], sR = wlms[IDX.SH_R];
   const shoulderWidth = Math.hypot(sL.x - sR.x, sL.y - sR.y, sL.z - sR.z);
-  if (shoulderWidth < 1e-4) return null;
+  const earDist = Math.hypot(eL.x - eR.x, eL.y - eR.y, eL.z - eR.z);
+  if (shoulderWidth < 1e-4 || earDist < 1e-4) return null;
   const earMidY = (eL.y + eR.y) / 2, shMidY = (sL.y + sR.y) / 2;
   const earMidZ = (eL.z + eR.z) / 2, shMidZ = (sL.z + sR.z) / 2;
   // world y 는 아래 방향(+). 귀가 어깨보다 위 → shMidY > earMidY → headVertical > 0.
@@ -64,7 +67,10 @@ export function extractAbsolute(wlms) {
   // headForward(거북목 전방이동): 어깨 대비 귀의 깊이(Z) 오프셋을 어깨너비로 정규화. Z는 단일카메라 추정치라
   // 노이즈가 크므로 강한 One-Euro로 다룬다. 부호/방향(귀가 앞으로 갈 때 증가/감소)은 Phase1 실기기 로그로 확정.
   const headForward = (shMidZ - earMidZ) / shoulderWidth;
-  return { headVertical, shoulderTilt, headForward };
+  // shoulderSpan(어깨 말림): 3D 어깨너비를 머리크기(귀간격)로 정규화. 어깨를 말면 3D 어깨너비가 줄어
+  // 기준보다 작아진다(거리 불변). 정면 2D가 약한 축이라 3D 깊이 포함이 핵심.
+  const shoulderSpan = shoulderWidth / earDist;
+  return { headVertical, shoulderTilt, headForward, shoulderSpan };
 }
 
 // FaceLandmarker facialTransformationMatrixes[0].data = 16개 column-major 4x4 (R|t),
@@ -97,6 +103,7 @@ export class AbsSmoother {
       shoulderTilt: new OneEuro({ minCutoff: 0.8, beta: 0.01 }),
       headPitch: new OneEuro({ minCutoff: 0.8, beta: 0.02 }),
       headForward: new OneEuro({ minCutoff: 0.5, beta: 0.005 }), // Z는 노이즈 커서 더 강하게 스무딩
+      shoulderSpan: new OneEuro({ minCutoff: 0.6, beta: 0.008 }), // 3D 폭도 Z 포함이라 강하게
     };
   }
   update(m, t) {
@@ -107,6 +114,9 @@ export class AbsSmoother {
     };
     if (m.headForward != null && Number.isFinite(m.headForward)) {
       out.headForward = this.f.headForward.filter(m.headForward, t);
+    }
+    if (m.shoulderSpan != null && Number.isFinite(m.shoulderSpan)) {
+      out.shoulderSpan = this.f.shoulderSpan.filter(m.shoulderSpan, t);
     }
     if (m.headPitch != null && Number.isFinite(m.headPitch)) {
       out.headPitch = this.f.headPitch.filter(m.headPitch, t);
@@ -136,6 +146,8 @@ export function finishAbsRef(samples) {
   // 전방머리 기준(Phase1: 측정만 — 판정엔 아직 미사용). 있으면 __pgLive 로 편차 로깅.
   const fwds = good.map((s) => s.headForward).filter((v) => v != null && Number.isFinite(v));
   if (fwds.length >= 3) ref.headForward = median(fwds);
+  const spans = good.map((s) => s.shoulderSpan).filter((v) => v != null && Number.isFinite(v));
+  if (spans.length >= 3) ref.shoulderSpan = median(spans);
   return ref;
 }
 
@@ -154,6 +166,13 @@ function forwardTerm(m, ref) {
   return f > 0 ? Math.min(f / FORWARD_FULL, 1.5) : 0;
 }
 
+// 어깨 말림 → 0..1.5. 3D 어깨너비/귀간격이 기준보다 '줄어든' 만큼만(말릴수록 감소).
+function spanTerm(m, ref) {
+  if (m.shoulderSpan == null || ref.shoulderSpan == null) return 0;
+  const sdrop = (ref.shoulderSpan - m.shoulderSpan) / Math.max(ref.shoulderSpan, 1e-3) - SPAN_DEADZONE;
+  return sdrop > 0 ? Math.min(sdrop / SPAN_FULL, 1.5) : 0;
+}
+
 // 좋은 기준 대비 얼마나 나빠졌는지 → 페널티(≥0). core 점수에 exp(-penalty)로 곱한다.
 export function absPenalty(m, ref) {
   if (!m || !ref || !ref.headVertical) return 0;
@@ -164,6 +183,7 @@ export function absPenalty(m, ref) {
   if (tilt > 0) pen += ABS_W.tilt * Math.min(tilt / TILT_FULL_DEG, 1.5);
   pen += ABS_W.pitch * pitchTerm(m, ref);      // 고개 숙임(머리 각도 편차)
   pen += ABS_W.forward * forwardTerm(m, ref);  // 거북목 전방이동(깊이 Z) — 정면 카메라가 약한 핵심 축
+  pen += ABS_W.span * spanTerm(m, ref);        // 어깨 말림(3D 어깨너비 축소)
   return pen;
 }
 
@@ -174,8 +194,9 @@ export function absWorst(m, ref) {
   const drop = (ref.headVertical - m.headVertical) / Math.max(ref.headVertical, 1e-3) - HEAD_DROP_DEADZONE;
   const tilt = (m.shoulderTilt - (ref.shoulderTilt + TILT_MARGIN_DEG)) / TILT_FULL_DEG;
   const neck = Math.max(drop, pitchTerm(m, ref), forwardTerm(m, ref)); // 목 문제 = 수직드롭·머리각·전방이동
-  if (neck <= 0 && tilt <= 0) return null;
-  return neck >= tilt ? "head_drop" : "shoulder_roll"; // "head_drop" 키 = Buddy 거북목 메시지(턱 당기기)
+  const shoulder = Math.max(tilt, spanTerm(m, ref)); // 어깨 문제 = 기울기 또는 말림
+  if (neck <= 0 && shoulder <= 0) return null;
+  return neck >= shoulder ? "head_drop" : "shoulder_roll"; // "head_drop"=거북목 메시지, "shoulder_roll"=등 굽음
 }
 
 // ── 트래킹 고스트 가이드용 2D 기하 (판정과 무관, 렌더 전용) ──

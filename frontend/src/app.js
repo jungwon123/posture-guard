@@ -508,7 +508,10 @@ function tick() {
       fwdDev: (absM?.headForward != null && absRef?.headForward != null) ? +(absM.headForward - absRef.headForward).toFixed(3) : null,
       // 어깨 기울기
       tilt: absM?.shoulderTilt != null ? +absM.shoulderTilt.toFixed(1) : null,
-      tiltRef: absRef?.shoulderTilt != null ? +absRef.shoulderTilt.toFixed(1) : null };
+      tiltRef: absRef?.shoulderTilt != null ? +absRef.shoulderTilt.toFixed(1) : null,
+      // 어깨 말림(3D span)
+      span: absM?.shoulderSpan != null ? +absM.shoulderSpan.toFixed(3) : null,
+      spanRef: absRef?.shoulderSpan != null ? +absRef.shoulderSpan.toFixed(3) : null };
 
     if (state !== prev) {
       logTransition(prev, state, now);
@@ -1302,13 +1305,16 @@ if (new URLSearchParams(location.search).has("fwd")) {
   setInterval(() => {
     const L = window.__pgLive || {};
     const dev = L.fwdDev, fwdBad = dev != null && dev > 0.10;
-    const tiltBad = (L.tilt != null && L.tiltRef != null) && (L.tilt > L.tiltRef + 5);
+    const tiltBad = (L.tilt != null && L.tiltRef != null) && (L.tilt > L.tiltRef + 3);
+    const spanDrop = (L.span != null && L.spanRef != null) ? (L.spanRef - L.span) / L.spanRef : null;
+    const spanBad = spanDrop != null && spanDrop > 0.06;
     dbg.textContent =
       `자세 게이트 진단\n` +
       `게이트: ${L.absOn ? "ON ✅" : "OFF ❌(재캘리브 필요)"}\n` +
       `총 페널티: ${L.absPen ?? "-"}\n` +
       `─ 거북목 fwd: ${L.fwd ?? "-"} / 기준 ${L.fwdRef ?? "-"} · Δ ${dev ?? "-"} ${fwdBad ? "⚠️" : ""}\n` +
-      `─ 어깨기울 : ${L.tilt ?? "-"}° / 기준 ${L.tiltRef ?? "-"}° ${tiltBad ? "⚠️감점" : "(기준+5°~)"}\n` +
+      `─ 어깨기울 : ${L.tilt ?? "-"}° / 기준 ${L.tiltRef ?? "-"}° ${tiltBad ? "⚠️감점" : "(기준+3°~)"}\n` +
+      `─ 어깨말림 : ${L.span ?? "-"} / 기준 ${L.spanRef ?? "-"} · 축소 ${spanDrop != null ? (spanDrop * 100).toFixed(0) + "%" : "-"} ${spanBad ? "⚠️감점" : "(6%~)"}\n` +
       `─ 머리각 pitch: ${L.pitch ?? "-"}°`;
   }, 300);
 }
