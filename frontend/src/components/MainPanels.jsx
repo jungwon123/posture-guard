@@ -14,9 +14,9 @@ export default function MainPanels() {
 
         {/* 카메라 시작 전 — 가장 먼저 눌러야 할 큰 시작 버튼 (첫 화면 길잡이) */}
         <div id="start-cta">
-          <div className="start-cta-desc">카메라로 자세를 확인해 보세요</div>
-          <button id="btn-start-hero" className="primary">📷 카메라 시작</button>
-          <div className="start-cta-sub">영상은 저장·전송되지 않아요</div>
+          <div className="start-cta-desc">요정이 지켜보는 공부방, 시작할까요?</div>
+          <button id="btn-start-hero" className="primary">📚 공부 시작</button>
+          <div className="start-cta-sub">카메라가 자세를 봐줘요 · 영상은 저장·전송되지 않아요</div>
         </div>
 
         {/* 바른자세 기준 등록 중 — 자세 안내 + 큰 카운트다운 */}

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import Header from "./components/Header.jsx";
 import MainPanels from "./components/MainPanels.jsx";
+import StudyTimer from "./components/StudyTimer.jsx";
 import Controls from "./components/Controls.jsx";
 import AttendanceCard from "./components/AttendanceCard.jsx";
 import PostureChart from "./components/PostureChart.jsx";
@@ -34,6 +35,7 @@ export default function App() {
       <Header />
 
       <div className="page" style={show("main")}>
+        <StudyTimer />
         <MainPanels />
         <Controls />
         <AttendanceCard />

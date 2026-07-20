@@ -313,8 +313,8 @@ async function start() {
     return;
   }
   running = true;
-  els.btnStart.textContent = "측정 종료";
-  els.btnStart.classList.add("danger"); // 측정 중엔 종료 버튼임을 색으로 분명히
+  els.btnStart.textContent = "공부 종료";
+  els.btnStart.classList.add("danger"); // 공부 중엔 종료 버튼임을 색으로 분명히
   els.btnStart.disabled = false;
   els.btnCalib.disabled = false;
   els.btnCalib.textContent = judge ? "기준 다시 잡기" : "바른자세 기준 등록 (5초)";
@@ -350,7 +350,7 @@ function stop() {
   const s = els.cam.srcObject;
   if (s) { s.getTracks().forEach((t) => t.stop()); els.cam.srcObject = null; }
   blinkSampling = false;
-  els.btnStart.textContent = "카메라 시작";
+  els.btnStart.textContent = "공부 시작";
   els.btnStart.classList.remove("danger");
   els.btnCalib.disabled = true;
   els.btnCalib.classList.remove("pulse");
