@@ -6,13 +6,14 @@ export const TUNING = {
   EMA_ALPHA: 0.3,
   CALIB_SECS: 5.0,
   SIGMA_FLOOR_FRAC: 0.04,
-  DEADZONE_Z: 1.0,
-  // v2 재정의: head_drop(머리 높이, 코 기반) 폐기 — pitch와 이중계산이라 headVertical(절대게이트)로 대체.
-  // 남은 3신호를 합=1로 재정규화(기존 0.35/0.30/0.10 ÷ 0.75).
-  WEIGHTS: { proximity: 0.47, pitch: 0.40, shoulder_roll: 0.13 },
+  DEADZONE_Z: 1.2,   // 살짝 상향(1.0→1.2) — 잔떨림/약한 편차에 덜 예민하게.
+  // v2 재정의: head_drop 폐기(headVertical 대체). 그리고 pitch(고개 숙임) 가중치 대폭↓ —
+  // 인강 필기 등 '고개를 숙여 보는' 정상 동작을 나쁜 자세로 오탐하지 않도록. 진짜 나쁜 자세(거북목·구부정)는
+  // 절대 게이트(headForward/어깨)가 잡는다. 합=1.
+  WEIGHTS: { proximity: 0.5, pitch: 0.18, shoulder_roll: 0.32 },
   SCORE_K: 1.0,
   BAD_ENTER_SCORE: 60,
-  BAD_ENTER_SUSTAIN: 5.0,
+  BAD_ENTER_SUSTAIN: 7.0,   // 5→7초: 잠깐 숙였다 드는 정도로는 잔소리 안 하게(지속적일 때만).
   GOOD_ENTER_SCORE: 75,
   GOOD_ENTER_SUSTAIN: 3.0,
   AWAY_AFTER: 10.0,
