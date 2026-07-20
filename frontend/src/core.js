@@ -14,6 +14,11 @@ export const TUNING = {
   SCORE_K: 1.0,
   BAD_ENTER_SCORE: 60,
   BAD_ENTER_SUSTAIN: 7.0,   // 5→7초: 잠깐 숙였다 드는 정도로는 잔소리 안 하게(지속적일 때만).
+  // 주의(CAUTION) 중간 단계 — 논문(JIIBC 2024)의 YELLOW에 해당. 생체역학 근거: 바른자세 목하중 ~5kg가
+  // 두 배(~12kg)로 늘기 시작하는 각도대. GOOD↔BAD 사이 '부드러운 조기 경고'(알람·진동 없음, 요정 표정만).
+  CAUTION_ENTER_SCORE: 73,     // 이 아래로 떨어지면(단, BAD는 아님) 주의
+  CAUTION_ENTER_SUSTAIN: 2.5,  // 알람이 아니라 표정만이라 비교적 빠르게 반응
+  CAUTION_TO_BAD_SUSTAIN: 5.0, // 이미 주의 상태 → BAD로는 조금 빠르게(7→5)
   GOOD_ENTER_SCORE: 75,
   GOOD_ENTER_SUSTAIN: 3.0,
   AWAY_AFTER: 10.0,
@@ -125,13 +130,7 @@ export class StateMachine {
       return this.state;
     }
 
-    let target = null, sustain = 0;
-    if (this.state === "GOOD" && score < TUNING.BAD_ENTER_SCORE) {
-      target = "BAD"; sustain = TUNING.BAD_ENTER_SUSTAIN;
-    } else if (this.state === "BAD" && score > TUNING.GOOD_ENTER_SCORE) {
-      target = "GOOD"; sustain = TUNING.GOOD_ENTER_SUSTAIN;
-    }
-
+    const [target, sustain] = this._pick(score);
     if (target === null) {
       this.cand = null;
     } else if (this.cand && this.cand[0] === target) {
@@ -140,6 +139,22 @@ export class StateMachine {
       this.cand = [target, now];
     }
     return this.state;
+  }
+
+  // 현재 상태·점수 → [목표상태, 필요지속시간]. 순서 GOOD>CAUTION>BAD, 히스테리시스로 튐 방지.
+  _pick(score) {
+    const T = TUNING;
+    if (this.state === "GOOD") {
+      if (score < T.BAD_ENTER_SCORE) return ["BAD", T.BAD_ENTER_SUSTAIN];       // 급락은 곧장 BAD로(기존 타이밍 유지)
+      if (score < T.CAUTION_ENTER_SCORE) return ["CAUTION", T.CAUTION_ENTER_SUSTAIN]; // 완만한 하락 → 주의
+    } else if (this.state === "CAUTION") {
+      if (score < T.BAD_ENTER_SCORE) return ["BAD", T.CAUTION_TO_BAD_SUSTAIN];  // 주의에서 더 나빠짐 → BAD
+      if (score >= T.GOOD_ENTER_SCORE) return ["GOOD", T.GOOD_ENTER_SUSTAIN];   // 회복 → GOOD
+    } else if (this.state === "BAD") {
+      if (score >= T.GOOD_ENTER_SCORE) return ["GOOD", T.GOOD_ENTER_SUSTAIN];   // 완전 회복
+      if (score >= T.CAUTION_ENTER_SCORE) return ["CAUTION", T.CAUTION_ENTER_SUSTAIN]; // 부분 회복 → 주의 경유
+    }
+    return [null, 0];
   }
 }
 

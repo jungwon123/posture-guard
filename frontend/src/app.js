@@ -34,7 +34,9 @@ const els = {
   awayNotice: $("away-notice"), centerPop: $("center-pop"), centerPopCard: $("center-pop-card"),
 };
 
-const STATE_COLOR = { GOOD: "#5abe5a", BAD: "#e64545", AWAY: "#a0a0a0", UNCALIBRATED: "#e6aa3c" };
+const STATE_COLOR = { GOOD: "#5abe5a", CAUTION: "#e8a72c", BAD: "#e64545", AWAY: "#a0a0a0", UNCALIBRATED: "#e6aa3c" };
+// 상태 칩에 표시할 한국어 라벨(주의 단계 추가로 영문 상태명 대신 사람 말로)
+const STATE_LABEL = { GOOD: "바른 자세", CAUTION: "주의", BAD: "자세 무너짐", AWAY: "자리 비움", UNCALIBRATED: "준비 중" };
 
 // ── 척추요정 스프라이트 (assets/fairy — cheokcheok-manifest.json 의 frame_layout, 9상태) ──
 const SPRITE = {
@@ -67,6 +69,7 @@ function spriteAnim(state, now) {
     if (dur >= TUNING.ESCALATE_NOTIFY) return "angry";      // "교정 안 했어?!"
     return "alert";                                         // "자세가 틀어졌어요!"
   }
+  if (state === "CAUTION") return "encourage";              // 주의 — "곧게 펴볼까요?" (알람 없이)
   if (sm.cand?.[0] === "BAD") return "encourage";           // 무너지는 중 — 다잡기
   if (now < rewardUntil) return "reward";                   // "보상 받았어요!"
   if (now < praiseUntil) return "praise";                   // "정말 잘하고 있어요!"
@@ -643,6 +646,10 @@ function tick() {
         const m = `${face} 자세가 틀어졌어요! 허리를 펴요`;
         notify(m); playAlert(1, m); speak("허리 펴요! 🔥");
       }
+      else if (state === "CAUTION" && prev === "GOOD") {
+        // 주의 = 부드러운 조기 경고. 알람·진동·배너 없이 요정 말풍선만(과민 방지).
+        speak("살짝 무너졌어요, 곧게 펴볼까요? 🌱");
+      }
       else if (prev === "BAD" && state === "GOOD") {
         praiseUntil = now + 3; // 칭찬 모션
         speak("잘하고 있어요! 💚");
@@ -674,7 +681,7 @@ function tick() {
 
 // ── UI 렌더 ──
 function renderUI(state, score, zs, now, face) {
-  els.pill.textContent = state;
+  els.pill.textContent = STATE_LABEL[state] || state;
   els.pill.style.background = STATE_COLOR[state];
   els.score.textContent = score === null ? "score --" : `score ${score.toFixed(1)}`;
   els.points.textContent = `🪙 ${rewards.points}P`;
@@ -684,6 +691,7 @@ function renderUI(state, score, zs, now, face) {
   updateFaceCover(state, now, face);
 
   const dur = sm.stateSince ? now - sm.stateSince : 0;
+  els.camPanel.classList.toggle("caution", state === "CAUTION");
   els.camPanel.classList.toggle("bad", state === "BAD");
   els.camPanel.classList.toggle("bad-hard", state === "BAD" && dur >= TUNING.ESCALATE_NOTIFY);
   els.camPanel.classList.toggle("vignette", state === "BAD" && dur >= TUNING.ESCALATE_VIGNETTE);
@@ -1431,17 +1439,37 @@ renderSummary();
 // 사용법: 바른자세 기준 등록(캘리브) 후, 정자세 vs 거북목에서 Δ(현재-기준)가 유의미하게 갈리는지 관찰.
 if (new URLSearchParams(location.search).has("fwd")) {
   const dbg = document.createElement("div");
-  dbg.style.cssText = "position:fixed;left:8px;top:8px;z-index:99999;background:rgba(0,0,0,.78);color:#5ec8e0;font:12px/1.55 ui-monospace,monospace;padding:7px 10px;border-radius:9px;white-space:pre;pointer-events:none";
+  dbg.style.cssText = "position:fixed;left:8px;top:8px;z-index:99999;background:rgba(0,0,0,.82);color:#5ec8e0;font:12px/1.55 ui-monospace,monospace;padding:7px 10px;border-radius:9px;white-space:pre;pointer-events:none;max-width:92vw";
   document.body.appendChild(dbg);
+  // Z 부호·노이즈 실기기 검증용 누적 통계: 캘리브 후 정자세→거북목으로 움직이며 Δ가
+  // '거북목일 때 +로 유의미하게' 커지면 부호 정상. 최근 Δ 표본으로 노이즈(범위)도 본다.
+  let devSamples = [];
+  let devMax = null, devMin = null;
   setInterval(() => {
     const L = window.__pgLive || {};
     const dev = L.fwdDev, fwdBad = dev != null && dev > 0.10;
+    if (dev != null) {
+      devSamples.push(dev); if (devSamples.length > 40) devSamples.shift();
+      devMax = devMax == null ? dev : Math.max(devMax, dev);
+      devMin = devMin == null ? dev : Math.min(devMin, dev);
+    }
+    // 최근 표본의 진폭(노이즈 가늠) + 부호 검증 자동 판정
+    let verdict = "대기 — 정자세 유지 후 거북목을 해보세요";
+    if (devMax != null) {
+      const noise = devSamples.length > 4
+        ? Math.max(...devSamples) - Math.min(...devSamples) : null;
+      if (devMax > 0.12) verdict = `부호 정상 ✅ (거북목서 Δ +${devMax.toFixed(2)}까지)`;
+      else if (devMin < -0.12) verdict = `부호 뒤집힘 ❌ (거북목서 Δ −로 감) → forwardTerm 부호 반전 필요`;
+      else verdict = `아직 변화 작음 (Δ범위 ${devMin?.toFixed(2)}~${devMax?.toFixed(2)})`;
+      if (noise != null && noise > 0.20) verdict += ` ⚠️노이즈 큼(${noise.toFixed(2)})`;
+    }
     const tiltBad = (L.tilt != null && L.tiltRef != null) && (L.tilt > L.tiltRef + 3);
     const spanDrop = (L.span != null && L.spanRef != null) ? (L.spanRef - L.span) / L.spanRef : null;
     const spanBad = spanDrop != null && spanDrop > 0.06;
     dbg.textContent =
       `자세 게이트 진단\n` +
       `게이트: ${L.absOn ? "ON ✅" : "OFF ❌(재캘리브 필요)"}\n` +
+      `[Z부호 검증] ${verdict}\n` +
       `총 페널티: ${L.absPen ?? "-"}\n` +
       `─ 거북목 fwd: ${L.fwd ?? "-"} / 기준 ${L.fwdRef ?? "-"} · Δ ${dev ?? "-"} ${fwdBad ? "⚠️" : ""}\n` +
       `─ 어깨기울 : ${L.tilt ?? "-"}° / 기준 ${L.tiltRef ?? "-"}° ${tiltBad ? "⚠️감점" : "(기준+3°~)"}\n` +

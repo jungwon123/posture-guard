@@ -31,24 +31,25 @@ const C_GOOD = "#4fd07a", C_BAD = "#ff7a7a", C_AWAY = "#9aa6c9", C_EMPTY = "#3a4
 const C_AMBER = "#f59e2b"; // 초록과 확실히 구분되게 더 진한 주황
 const barColor = (acc, hasData) => (!hasData ? C_EMPTY : acc >= 70 ? C_GOOD : acc >= 40 ? C_AMBER : C_BAD);
 
-// 구간 [start,end]의 GOOD/BAD 누적·비율·최장 GOOD
+// 구간 [start,end]의 GOOD/CAUTION/BAD 누적·비율·최장 GOOD. 공부시간=바름+주의+나쁨, 비율=바름/공부시간.
 function aggregate(events, start, end, now) {
-  let good = 0, bad = 0, longestGood = 0;
+  let good = 0, caution = 0, bad = 0, longestGood = 0;
   for (let i = 0; i < events.length; i++) {
     const st = events[i].to;
-    if (st !== "GOOD" && st !== "BAD") continue;
+    if (st !== "GOOD" && st !== "BAD" && st !== "CAUTION") continue;
     const s = Math.max(events[i].t, start);
     const e = Math.min(i + 1 < events.length ? events[i + 1].t : now, end);
     if (e <= s) continue;
     if (st === "GOOD") { good += e - s; longestGood = Math.max(longestGood, e - s); }
+    else if (st === "CAUTION") caution += e - s;
     else bad += e - s;
   }
-  const study = good + bad;
-  return { study, good, bad, longestGood, ratio: study > 0 ? good / study : null };
+  const study = good + caution + bad;
+  return { study, good, caution, bad, longestGood, ratio: study > 0 ? good / study : null };
 }
-// 구간의 상태별(GOOD/BAD/AWAY) 누적 초
+// 구간의 상태별(GOOD/CAUTION/BAD/AWAY) 누적 초
 function stateTotals(events, start, end, now) {
-  const acc = { GOOD: 0, BAD: 0, AWAY: 0 };
+  const acc = { GOOD: 0, CAUTION: 0, BAD: 0, AWAY: 0 };
   for (let i = 0; i < events.length; i++) {
     const st = events[i].to;
     if (!(st in acc)) continue;
@@ -103,17 +104,39 @@ function readData() {
   const st = stateTotals(events, t0, now, now);
   const breakdown = [
     { key: "GOOD", name: "바른 자세", value: st.GOOD, color: C_GOOD },
+    { key: "CAUTION", name: "주의", value: st.CAUTION, color: C_AMBER },
     { key: "BAD", name: "나쁜 자세", value: st.BAD, color: C_BAD },
     { key: "AWAY", name: "자리 비움", value: st.AWAY, color: C_AWAY },
   ].filter((x) => x.value > 0);
-  const breakdownTotal = st.GOOD + st.BAD + st.AWAY;
+  const breakdownTotal = st.GOOD + st.CAUTION + st.BAD + st.AWAY;
 
   const today = aggregate(events, t0, now, now);
   const thisWeek = aggregate(events, weekStartSec(0), now, now);
   const lastWeek = aggregate(events, weekStartSec(1), weekStartSec(0), now);
 
+  // ⑤ 최근 28일 자세 정확도 추세 — 논문(JIIBC 2024)의 선형회귀 기울기 기법.
+  // 하루 정확도(%)를 (경과일 x, 정확도 y)로 놓고 최소제곱 기울기 → '한 달간 교정되고 있나'.
+  const trendPts = [];
+  for (let k = 27; k >= 0; k--) {
+    const { start, end } = dayBounds(k);
+    const a = aggregate(events, start, Math.min(end, now), now);
+    if (a.ratio != null && a.study > 60) trendPts.push({ x: 27 - k, y: a.ratio * 100 });
+  }
+  let trend = null;
+  if (trendPts.length >= 4) {
+    const n = trendPts.length;
+    const mx = trendPts.reduce((s, p) => s + p.x, 0) / n;
+    const my = trendPts.reduce((s, p) => s + p.y, 0) / n;
+    let num = 0, den = 0;
+    for (const p of trendPts) { num += (p.x - mx) * (p.y - my); den += (p.x - mx) ** 2; }
+    const slope = den > 0 ? num / den : 0; // 하루당 %p
+    trend = { slope, days: n, perWeek: slope * 7, avg: Math.round(my) };
+  } else {
+    trend = { slope: 0, days: trendPts.length, perWeek: 0, avg: null, insufficient: true };
+  }
+
   // 오늘 상태 변화 로그(최근 15개)
-  const L = { GOOD: "바른 자세 🟢", BAD: "나쁜 자세 🔴", AWAY: "자리 비움 ⚪" };
+  const L = { GOOD: "바른 자세 🟢", CAUTION: "주의 🟡", BAD: "나쁜 자세 🔴", AWAY: "자리 비움 ⚪" };
   const log = events.filter((ev) => ev.t >= t0 && ev.from && L[ev.to]).slice(-15).reverse()
     .map((ev) => ({ time: new Date(ev.t * 1000).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }), text: L[ev.to] }));
 
@@ -126,7 +149,18 @@ function readData() {
   }));
   const blinkAvg = blink.length ? Math.round(blink.reduce((a, b) => a + b.rate, 0) / blink.length) : null;
 
-  return { series, daily, dailyHasData, breakdown, breakdownTotal, today, thisWeek, lastWeek, log, blink, blinkAvg };
+  return { series, daily, dailyHasData, breakdown, breakdownTotal, today, thisWeek, lastWeek, log, blink, blinkAvg, trend };
+}
+
+// 월간 추세 배너 — 기울기 부호로 격려/주의. 데이터 부족하면 안내만.
+function TrendBanner({ trend }) {
+  if (!trend || trend.insufficient) {
+    return <div className="trend-banner flat">📈 며칠 더 기록하면 <b>한 달 자세 추세</b>를 보여줄게요 (최소 4일)</div>;
+  }
+  const pw = trend.perWeek;
+  if (pw >= 2) return <div className="trend-banner up">📈 최근 {trend.days}일 <b>좋아지고 있어요 ↗</b> · 주당 +{Math.round(pw)}%p</div>;
+  if (pw <= -2) return <div className="trend-banner down">📉 최근 {trend.days}일 <b>조금씩 나빠지고 있어요 ↘</b> · 자세에 신경 써봐요 (주당 {Math.round(pw)}%p)</div>;
+  return <div className="trend-banner flat">📊 최근 {trend.days}일 <b>꾸준히 유지 중</b> · 평균 바름 {trend.avg}%</div>;
 }
 
 function Delta({ now, prev, unit, pct }) {
@@ -190,6 +224,7 @@ export default function PostureChart() {
           <p className="hint">아직 오늘 데이터가 없어요 — 카메라를 시작하면 자세 그래프가 여기 그려집니다.</p>
         ) : (
           <div className="charts">
+            <TrendBanner trend={d.trend} />
             {/* ① 시간별 자세 정확도 */}
             {hasHourly && (
               <section className="chart-sub">

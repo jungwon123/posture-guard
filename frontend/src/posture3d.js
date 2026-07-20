@@ -242,35 +242,42 @@ function tiltTerm(m, ref) {
   return t > 0 ? Math.min(t / TILT_FULL_DEG, 1.5) : 0;
 }
 
-// 좋은 기준 대비 얼마나 나빠졌는지 → 페널티(≥0). core 점수에 exp(-penalty)로 곱한다.
-export function absPenalty(m, ref) {
-  if (!m || !ref || !ref.headVertical) return 0;
-  return ABS_W.head * headDropTerm(m, ref)       // 머리 가라앉음
-    + ABS_W.tilt * tiltTerm(m, ref)              // 어깨 기울기
-    + ABS_W.pitch * pitchTerm(m, ref)            // 고개 숙임(머리 각도 편차)
-    + ABS_W.forward * forwardTerm(m, ref)        // 거북목 전방이동(깊이 Z)
-    + ABS_W.span * spanTerm(m, ref)              // 어깨 말림(3D 어깨너비 축소)
-    + ABS_W.lateral * lateralTerm(m, ref)        // 머리 좌우 쏠림
-    + ABS_W.roll * rollTerm(m, ref)              // 고개 갸웃
-    + ABS_W.prop * propTerm(m);                  // 손으로 얼굴 괴기
-}
-
-// 지금 '가장 크게 감점 중인' 절대 신호 → {key(메시지용), c(가중 기여도)}. 없으면 null.
-// 신호마다 자기에게 맞는 말풍선 키를 준다(예: 고개숙임=pitch, 어깨기울기=shoulder_tilt).
-export function absDominant(m, ref) {
-  if (!m || !ref || !ref.headVertical) return null;
-  const cands = [
+// 각 절대 신호의 (메시지키, 가중 기여도) 목록. absPenalty(결합)·absDominant(최댓값) 공용 SSoT.
+function absContribs(m, ref) {
+  return [
     ["head_drop", ABS_W.head * headDropTerm(m, ref)],    // 머리 가라앉음 → 거북목류
-    ["head_drop", ABS_W.forward * forwardTerm(m, ref)],  // 거북목 전방이동
-    ["pitch", ABS_W.pitch * pitchTerm(m, ref)],          // 고개 숙임
+    ["head_drop", ABS_W.forward * forwardTerm(m, ref)],  // 거북목 전방이동(깊이 Z)
+    ["pitch", ABS_W.pitch * pitchTerm(m, ref)],          // 고개 숙임(머리 각도)
     ["shoulder_tilt", ABS_W.tilt * tiltTerm(m, ref)],    // 어깨 높이 비대칭
     ["shoulder_roll", ABS_W.span * spanTerm(m, ref)],    // 어깨 말림/등 굽음
     ["head_tilt", ABS_W.lateral * lateralTerm(m, ref)],  // 좌우 쏠림
     ["head_tilt", ABS_W.roll * rollTerm(m, ref)],        // 고개 갸웃
     ["hand_face", ABS_W.prop * propTerm(m)],             // 손으로 얼굴 괴기
   ];
+}
+
+// 상관된 신호의 중복 감점을 줄이는 할인 계수. 논문(JIIBC 2024)의 상관분석에서
+// 목-머리 각도 0.95 / 목-어깨 0.72 / 어깨-머리 0.70 으로, 거북목·고개숙임·어깨말림은
+// 슬라우치 때 '같이' 움직인다. 순수 합산이면 한 번 무너진 걸 3~4번 감점(과민) → QC 피드백의
+// '너무 민감'과 필기 오탐의 원인. 그래서 '가장 큰 기여는 full, 나머지는 0.35만' 반영한다.
+const SECONDARY_DISCOUNT = 0.35;
+
+// 좋은 기준 대비 얼마나 나빠졌는지 → 페널티(≥0). core 점수에 exp(-penalty)로 곱한다.
+// 지배신호 full + 나머지 할인 결합(상관 신호 중복 감점 완화).
+export function absPenalty(m, ref) {
+  if (!m || !ref || !ref.headVertical) return 0;
+  const cs = absContribs(m, ref).map(([, c]) => c);
+  const sum = cs.reduce((a, b) => a + b, 0);
+  const max = cs.reduce((a, b) => Math.max(a, b), 0);
+  return max + SECONDARY_DISCOUNT * (sum - max);
+}
+
+// 지금 '가장 크게 감점 중인' 절대 신호 → {key(메시지용), c(가중 기여도)}. 없으면 null.
+// 신호마다 자기에게 맞는 말풍선 키를 준다(예: 고개숙임=pitch, 어깨기울기=shoulder_tilt).
+export function absDominant(m, ref) {
+  if (!m || !ref || !ref.headVertical) return null;
   let bestKey = null, bestC = 0;
-  for (const [k, c] of cands) if (c > bestC) { bestC = c; bestKey = k; }
+  for (const [k, c] of absContribs(m, ref)) if (c > bestC) { bestC = c; bestKey = k; }
   return bestKey ? { key: bestKey, c: bestC } : null;
 }
 

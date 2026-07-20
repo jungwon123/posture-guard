@@ -139,6 +139,7 @@ export class Rewards {
     if (state === "UNCALIBRATED") return skin.egg;
     if (state === "AWAY") return skin.away;
     if (state === "BAD") return dur >= 60 ? skin.rage : skin.bad;
+    if (state === "CAUTION") return skin.warn;   // 주의 — 알람 없이 표정만 살짝 걱정
     if (badCandidate) return skin.warn;
     return skin.good;
   }
@@ -146,7 +147,7 @@ export class Rewards {
 
 // 오늘 리포트 — 상태 전이 기록(events)에서 계산. 순수 함수.
 export function computeReport(events, dayStartSec, nowSec) {
-  const acc = { GOOD: 0, BAD: 0, AWAY: 0 };
+  const acc = { GOOD: 0, CAUTION: 0, BAD: 0, AWAY: 0 };
   let badCount = 0, longestGood = 0;
   for (let i = 0; i < events.length; i++) {
     const start = Math.max(events[i].t, dayStartSec);
@@ -157,7 +158,8 @@ export function computeReport(events, dayStartSec, nowSec) {
     if (st === "GOOD") longestGood = Math.max(longestGood, end - start);
     if (st === "BAD" && events[i].t >= dayStartSec) badCount++;
   }
-  const watched = acc.GOOD + acc.BAD;
+  // 감시시간 = 바른+주의+나쁜(자리비움 제외). 주의는 '완전한 바름'은 아니라 비율을 살짝 낮춘다.
+  const watched = acc.GOOD + acc.CAUTION + acc.BAD;
   const ratio = watched > 0 ? acc.GOOD / watched : null;
   const grade = ratio === null ? "" :
     ratio >= 0.9 ? "완벽! 요정이 춤을 춰요" :
