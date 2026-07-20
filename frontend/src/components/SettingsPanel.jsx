@@ -2,7 +2,7 @@
 export default function SettingsPanel() {
   return (
     <details id="settings">
-      <summary>🔔 알림 설정</summary>
+      <summary>알림 설정</summary>
       <div className="row">
         <label>방식</label>
         <select id="set-mode" defaultValue="sound">

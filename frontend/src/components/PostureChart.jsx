@@ -180,8 +180,8 @@ export default function PostureChart() {
   return (
     <div className="card chart-card">
       <div className="seg-tabs">
-        <button className={tab === "chart" ? "on" : ""} onClick={() => setTab("chart")}>📊 차트</button>
-        <button className={tab === "log" ? "on" : ""} onClick={() => setTab("log")}>📝 기록</button>
+        <button className={tab === "chart" ? "on" : ""} onClick={() => setTab("chart")}>차트</button>
+        <button className={tab === "log" ? "on" : ""} onClick={() => setTab("log")}>기록</button>
       </div>
 
       {tab === "chart" && (
@@ -192,7 +192,7 @@ export default function PostureChart() {
             {/* ① 시간별 자세 정확도 */}
             {hasHourly && (
               <section className="chart-sub">
-                <div className="chart-title">⏱️ 시간별 자세 정확도 추이</div>
+                <div className="chart-title">시간별 자세 정확도 추이</div>
                 <ResponsiveContainer width="100%" height={200}>
                   <AreaChart data={d.series} margin={{ top: 8, right: 10, left: -18, bottom: 0 }}>
                     <defs>
@@ -217,7 +217,7 @@ export default function PostureChart() {
             {/* ② 최근 7일 공부시간 */}
             {d.dailyHasData && (
               <section className="chart-sub">
-                <div className="chart-title">📅 최근 7일 공부시간</div>
+                <div className="chart-title">최근 7일 공부시간</div>
                 <ResponsiveContainer width="100%" height={190}>
                   <BarChart data={d.daily} margin={{ top: 8, right: 10, left: -18, bottom: 0 }}>
                     <CartesianGrid stroke="var(--line)" strokeDasharray="3 3" vertical={false} />
@@ -239,7 +239,7 @@ export default function PostureChart() {
             {/* ③ 오늘 자세 비율 */}
             {d.breakdownTotal > 0 && (
               <section className="chart-sub">
-                <div className="chart-title">🥧 오늘 자세 비율</div>
+                <div className="chart-title">오늘 자세 비율</div>
                 <div className="pie-wrap">
                   <ResponsiveContainer width="100%" height={190}>
                     <PieChart>
@@ -263,7 +263,7 @@ export default function PostureChart() {
             {/* ④ 오늘 눈 깜빡임 (분당) */}
             {d.blink.length > 0 && (
               <section className="chart-sub">
-                <div className="chart-title">👁 오늘 눈 깜빡임 (분당)</div>
+                <div className="chart-title">오늘 눈 깜빡임 (분당)</div>
                 <ResponsiveContainer width="100%" height={190}>
                   <AreaChart data={d.blink} margin={{ top: 8, right: 10, left: -18, bottom: 0 }}>
                     <defs>

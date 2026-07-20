@@ -2,7 +2,7 @@
 export default function EyeCarePanel() {
   return (
     <details id="eyecare">
-      <summary>👁 눈 깜빡임 챙기기</summary>
+      <summary>눈 깜빡임 챙기기</summary>
       <div className="row">
         <label style={{ minWidth: "auto" }}>
           <input type="checkbox" id="set-blink" /> 눈 깜빡임 재기 (기본 켜짐)

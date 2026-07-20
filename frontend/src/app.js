@@ -674,7 +674,7 @@ function drawTracking(state, zs) {
       ctx.beginPath(); ctx.moveTo(...gEar); ctx.lineTo(...shMid); ctx.stroke();       // 목표 목선
       ctx.setLineDash([]);
       ctx.fillStyle = gcol; ctx.font = "12px sans-serif"; ctx.textAlign = "center";
-      ctx.fillText("🎯 바른자세", gEar[0], gEar[1] - hr - 8);
+      ctx.fillText("바른자세", gEar[0], gEar[1] - hr - 8);
       ctx.textAlign = "left";
       if (!aligned) { // 라이브 머리 → 목표로 유도선
         ctx.strokeStyle = "rgba(230,170,60,0.55)"; ctx.lineWidth = 1.5;
@@ -1124,7 +1124,7 @@ function renderHallOfFame(rows, champions = []) {
     </div>`;
   }).join("");
   return `<div class="hof">
-    <div class="hof-head"><div class="hof-title">🏆 명예의 전당</div>
+    <div class="hof-head"><div class="hof-title">명예의 전당</div>
       <div class="hof-sub">바른 자세로 빛나는 우리의 기록!</div></div>
     ${podium}
     <div class="hof-legend"><span><span class="dot good"></span>활동 중</span>
@@ -1145,7 +1145,7 @@ function renderHofCards(rows, champions) {
     ? `<span class="hof-ic">👑</span><span>이번 주 1위 <b>${esc(leader.nickname)}</b> · ${(leader.good_sec / 60).toFixed(0)}분</span>`
     : `<span class="hof-ic">👑</span><span>이번 주 1위 자리는 아직 비어있어요!</span>`;
   const champs = (champions && champions.length)
-    ? `<div class="hof-champs"><div class="hof-champs-t">👑 역대 챔피언</div>${champions.map((c) =>
+    ? `<div class="hof-champs"><div class="hof-champs-t">역대 챔피언</div>${champions.map((c) =>
         `<div class="champ-row"><span class="champ-week">${champWeekLabel(c.week)}</span>` +
         `<span class="champ-nick">🏅 ${esc(c.nickname)}</span>` +
         `<span class="champ-sec">${(c.good_sec / 60).toFixed(0)}분</span></div>`).join("")}</div>`
@@ -1192,7 +1192,7 @@ function renderGroupSwitcher() {
     return;
   }
   const multi = list.length > 1;
-  el.innerHTML = `<div class="gl-label">🏠 내 그룹${multi ? ` ${list.length}개 · 탭해서 이동` : ""}</div>` +
+  el.innerHTML = `<div class="gl-label">내 그룹${multi ? ` ${list.length}개 · 탭해서 이동` : ""}</div>` +
     `<div class="gl-list">` + list.map((g) => {
       const on = active && active.code === g.code;
       const cnt = g.members ? `<span class="gl-cnt">· 👥 ${g.members}명</span>` : "";

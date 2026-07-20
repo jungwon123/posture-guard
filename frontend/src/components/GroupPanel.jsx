@@ -4,14 +4,14 @@ export default function GroupPanel() {
     <>
     <img className="page-banner sq" src="/assets/ui/group.png" alt="그룹" />
     <details id="group" open>
-      <summary>🏆 우리 그룹</summary>
+      <summary>우리 그룹</summary>
 
       {/* 내가 속한 방 목록 (app.js가 렌더) */}
       <div id="group-switcher" className="group-switcher"></div>
 
       {/* 그룹 만들기 · 코드로 참여 (접이식) */}
       <details id="group-add" className="group-add">
-        <summary>➕ 그룹 만들기 · 코드로 참여</summary>
+        <summary>그룹 만들기 · 코드로 참여</summary>
         <div className="row">
           <input type="text" id="group-name" placeholder="새 그룹 이름" maxLength={20} style={{ flex: 1, minWidth: 0 }} />
           <button id="btn-group-create" className="primary">만들기</button>
