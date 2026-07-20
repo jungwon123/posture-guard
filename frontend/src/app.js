@@ -586,6 +586,29 @@ const KEYPT = { [LM.NOSE]: "#e6763c", [LM.EAR_L]: "#e6aa3c", [LM.EAR_R]: "#e6aa3
 // 신호 이름 → 쉬운 한국어 (트래킹 막대 라벨)
 const SIGNAL_KR = { proximity: "화면 거리", pitch: "고개 숙임", head_drop: "머리 높이", shoulder_roll: "어깨 말림" };
 
+// 캘리브 5초 동안 트래킹에 뜨는 '여기에 상반신을 맞춰요' 실루엣 가이드 (머리 + 어깨/상체)
+function drawCalibGuide(ctx, w, h) {
+  const cx = w / 2;
+  ctx.save();
+  ctx.setLineDash([11, 8]); ctx.lineWidth = 3.5; ctx.lineJoin = "round"; ctx.lineCap = "round";
+  ctx.strokeStyle = "rgba(96,209,200,0.9)";                 // 청록 점선
+  ctx.shadowColor = "rgba(96,209,200,0.55)"; ctx.shadowBlur = 8;
+  const hy = h * 0.30, hr = h * 0.13;                       // 머리 중심·반지름
+  ctx.beginPath(); ctx.arc(cx, hy, hr, 0, 7); ctx.stroke(); // 머리
+  const top = hy + hr;                                      // 어깨 시작(목 아래)
+  ctx.beginPath();                                          // 어깨~상체 실루엣
+  ctx.moveTo(cx - w * 0.26, h);
+  ctx.bezierCurveTo(cx - w * 0.25, h * 0.60, cx - w * 0.17, top, cx, top);
+  ctx.bezierCurveTo(cx + w * 0.17, top, cx + w * 0.25, h * 0.60, cx + w * 0.26, h);
+  ctx.stroke();
+  ctx.restore();
+  const remain = Math.max(0, Math.ceil(calibUntil - nowSec()));
+  ctx.textAlign = "center";
+  ctx.fillStyle = "rgba(96,209,200,0.95)"; ctx.font = "bold 16px sans-serif";
+  ctx.fillText(`이 안에 상반신을 맞춰 바르게 앉아요 · ${remain}초`, cx, 26);
+  ctx.textAlign = "left";
+}
+
 function drawTracking(state, zs) {
   const ctx = els.track.getContext("2d");
   const { width: w, height: h } = els.track;
@@ -595,10 +618,13 @@ function drawTracking(state, zs) {
   for (let gx = 40; gx < w; gx += 40) { ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, h); ctx.stroke(); }
   for (let gy = 40; gy < h; gy += 40) { ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(w, gy); ctx.stroke(); }
 
+  const calibrating = calibUntil !== null;
+  if (calibrating) drawCalibGuide(ctx, w, h); // 5초 캘리브: '여기에 상반신을 맞춰요' 실루엣
+
   const lms = lastResult?.landmarks?.[0];
   if (!lms) {
     ctx.fillStyle = "#8b98a5"; ctx.font = "18px sans-serif"; ctx.textAlign = "center";
-    ctx.fillText("사람이 안 보여요", w / 2, h / 2);
+    ctx.fillText(calibrating ? "얼굴과 어깨가 보이게 앉아요" : "사람이 안 보여요", w / 2, h - 26);
     ctx.textAlign = "left";
     return;
   }
@@ -607,9 +633,9 @@ function drawTracking(state, zs) {
   const mid = (a, b) => [(px(a)[0] + px(b)[0]) / 2, (px(a)[1] + px(b)[1]) / 2];
   const stateCol = state === "BAD" ? "#e64545" : state === "GOOD" ? "#5abe5a" : "#8b98a5";
 
-  // ── 바른자세 고스트 가이드 (라이브 스켈레톤 뒤에 먼저 그림) ──
+  // ── 바른자세 고스트 가이드 (라이브 스켈레톤 뒤에 먼저 그림). 캘리브 중엔 실루엣 가이드가 대신 뜸 ──
   let aligned = null;
-  if (guideRef) {
+  if (guideRef && !calibrating) {
     const gp = projectGuide(guideRef, lms);
     if (gp && lms[7] && lms[8]) {
       const gEar = pp(gp.ear), gEarL = pp(gp.earL), gEarR = pp(gp.earR);
