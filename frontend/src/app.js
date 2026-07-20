@@ -5,7 +5,7 @@ import {
   StateMachine, finishCalibration,
 } from "./core.js";
 // 3D 절대 지표 레이어 — 개인 z-score 위에 "거리에 강한 + 절대 바른자세" 게이트를 얹는다(core 무수정).
-import { AbsSmoother, extractAbsolute, finishAbsRef, absPenalty, absWorst, headPoseFromMatrix,
+import { AbsSmoother, extractAbsolute, finishAbsRef, absPenalty, absDominant, headPoseFromMatrix,
   extractGuidePoints, finishGuide, projectGuide } from "./posture3d.js";
 import { Rewards, MELODIES, SKINS, SHOP, TIERS, computeReport } from "./reward.js";
 
@@ -508,9 +508,17 @@ function tick() {
     const face = rewards.fairy(state, dur, badCand);
 
     // 라이브 자세 노출 — 돌아다니는 요정 도우미(Buddy)가 읽어 문제 부위를 말풍선으로 콕 짚어줌
-    let worst = null, worstZ = TUNING.DEADZONE_Z;
-    for (const k in zs) if (zs[k] > worstZ) { worstZ = zs[k]; worst = k; }
-    if (!worst && absRef && absM) worst = absWorst(absM, absRef); // 2D가 못 짚으면 3D 절대 지표로
+    // 말풍선용 worst = '가장 크게 감점 중인' 신호. core z-score와 절대 게이트의 '가중 기여도'를
+    // 같은 척도로 비교해 지배 신호를 고른다(예전엔 core 우선이라 실제 문제와 자주 어긋남).
+    let worst = null, worstC = 0;
+    for (const k in zs) {
+      const c = TUNING.WEIGHTS[k] * Math.max(0, zs[k] - TUNING.DEADZONE_Z);
+      if (c > worstC) { worstC = c; worst = k; }
+    }
+    if (absRef && absM) {
+      const d = absDominant(absM, absRef);
+      if (d && d.c > worstC) { worstC = d.c; worst = d.key; }
+    }
     window.__pgLive = { running: true, state, score, worst, dur, ts: now,
       pitch: faceHead ? Math.round(faceHead.pitch) : null, // 실기기 부호 확인·디버그용
       absOn: !!(absRef && absM),                            // 절대 게이트(어깨기울기·거북목·머리각) 작동 여부
@@ -710,7 +718,7 @@ function drawTracking(state, zs) {
   if (worst && state === "BAD") {
     const pr = 13 + 4 * Math.sin(performance.now() / 160);
     ctx.strokeStyle = "#e64545"; ctx.lineWidth = 2;
-    for (const t of (worst === "shoulder_roll" ? [LM.SH_L, LM.SH_R] : [LM.EAR_L, LM.EAR_R])) {
+    for (const t of ((worst === "shoulder_roll" || worst === "shoulder_tilt") ? [LM.SH_L, LM.SH_R] : [LM.EAR_L, LM.EAR_R])) {
       const [x, y] = px(t); ctx.beginPath(); ctx.arc(x, y, pr, 0, 7); ctx.stroke();
     }
   }

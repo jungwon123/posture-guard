@@ -230,39 +230,53 @@ function propTerm(m) {
   return near > 0 ? Math.min(near / (PROP_NEAR - PROP_FULL), 1.5) : 0;
 }
 
+// 머리 가라앉음(귀-어깨 수직 축소) → 0.. . 기준 대비 deadzone 초과분.
+function headDropTerm(m, ref) {
+  if (!ref.headVertical) return 0;
+  const drop = (ref.headVertical - m.headVertical) / Math.max(ref.headVertical, 1e-3) - HEAD_DROP_DEADZONE;
+  return drop > 0 ? drop : 0;
+}
+// 어깨 기울기 → 0..1.5. 기준 + 마진 초과분.
+function tiltTerm(m, ref) {
+  const t = m.shoulderTilt - (ref.shoulderTilt + TILT_MARGIN_DEG);
+  return t > 0 ? Math.min(t / TILT_FULL_DEG, 1.5) : 0;
+}
+
 // 좋은 기준 대비 얼마나 나빠졌는지 → 페널티(≥0). core 점수에 exp(-penalty)로 곱한다.
 export function absPenalty(m, ref) {
   if (!m || !ref || !ref.headVertical) return 0;
-  let pen = 0;
-  const drop = (ref.headVertical - m.headVertical) / Math.max(ref.headVertical, 1e-3);
-  if (drop > HEAD_DROP_DEADZONE) pen += ABS_W.head * (drop - HEAD_DROP_DEADZONE);
-  const tilt = m.shoulderTilt - (ref.shoulderTilt + TILT_MARGIN_DEG);
-  if (tilt > 0) pen += ABS_W.tilt * Math.min(tilt / TILT_FULL_DEG, 1.5);
-  pen += ABS_W.pitch * pitchTerm(m, ref);      // 고개 숙임(머리 각도 편차)
-  pen += ABS_W.forward * forwardTerm(m, ref);  // 거북목 전방이동(깊이 Z) — 정면 카메라가 약한 핵심 축
-  pen += ABS_W.span * spanTerm(m, ref);        // 어깨 말림(3D 어깨너비 축소)
-  pen += ABS_W.lateral * lateralTerm(m, ref);  // 머리 좌우 쏠림
-  pen += ABS_W.roll * rollTerm(m, ref);        // 고개 갸웃
-  pen += ABS_W.prop * propTerm(m);             // 손으로 얼굴 괴기
-  return pen;
+  return ABS_W.head * headDropTerm(m, ref)       // 머리 가라앉음
+    + ABS_W.tilt * tiltTerm(m, ref)              // 어깨 기울기
+    + ABS_W.pitch * pitchTerm(m, ref)            // 고개 숙임(머리 각도 편차)
+    + ABS_W.forward * forwardTerm(m, ref)        // 거북목 전방이동(깊이 Z)
+    + ABS_W.span * spanTerm(m, ref)              // 어깨 말림(3D 어깨너비 축소)
+    + ABS_W.lateral * lateralTerm(m, ref)        // 머리 좌우 쏠림
+    + ABS_W.roll * rollTerm(m, ref)              // 고개 갸웃
+    + ABS_W.prop * propTerm(m);                  // 손으로 얼굴 괴기
 }
 
-// 절대 지표 중 어떤 문제가 지배적인지 — Buddy 말풍선 부위 힌트용(없으면 null).
-// headVertical 감소와 pitch 편차는 둘 다 '목' 문제(hurt_neck), shoulderTilt 는 '등/어깨'.
-export function absWorst(m, ref) {
+// 지금 '가장 크게 감점 중인' 절대 신호 → {key(메시지용), c(가중 기여도)}. 없으면 null.
+// 신호마다 자기에게 맞는 말풍선 키를 준다(예: 고개숙임=pitch, 어깨기울기=shoulder_tilt).
+export function absDominant(m, ref) {
   if (!m || !ref || !ref.headVertical) return null;
-  const drop = (ref.headVertical - m.headVertical) / Math.max(ref.headVertical, 1e-3) - HEAD_DROP_DEADZONE;
-  const tilt = (m.shoulderTilt - (ref.shoulderTilt + TILT_MARGIN_DEG)) / TILT_FULL_DEG;
-  const neck = Math.max(drop, pitchTerm(m, ref), forwardTerm(m, ref)); // 목 문제 = 수직드롭·머리각·전방이동
-  const shoulder = Math.max(tilt, spanTerm(m, ref));                    // 어깨 문제 = 기울기 또는 말림
-  const headTilt = Math.max(lateralTerm(m, ref), rollTerm(m, ref));    // 좌우 쏠림 또는 갸웃
-  const prop = propTerm(m);                                             // 손으로 얼굴 괴기
-  const best = Math.max(neck, shoulder, headTilt, prop);
-  if (best <= 0) return null;
-  if (best === prop) return "hand_face";
-  if (best === headTilt) return "head_tilt";
-  if (best === shoulder) return "shoulder_roll"; // 등 굽음
-  return "head_drop";                            // 거북목(턱 당기기)
+  const cands = [
+    ["head_drop", ABS_W.head * headDropTerm(m, ref)],    // 머리 가라앉음 → 거북목류
+    ["head_drop", ABS_W.forward * forwardTerm(m, ref)],  // 거북목 전방이동
+    ["pitch", ABS_W.pitch * pitchTerm(m, ref)],          // 고개 숙임
+    ["shoulder_tilt", ABS_W.tilt * tiltTerm(m, ref)],    // 어깨 높이 비대칭
+    ["shoulder_roll", ABS_W.span * spanTerm(m, ref)],    // 어깨 말림/등 굽음
+    ["head_tilt", ABS_W.lateral * lateralTerm(m, ref)],  // 좌우 쏠림
+    ["head_tilt", ABS_W.roll * rollTerm(m, ref)],        // 고개 갸웃
+    ["hand_face", ABS_W.prop * propTerm(m)],             // 손으로 얼굴 괴기
+  ];
+  let bestKey = null, bestC = 0;
+  for (const [k, c] of cands) if (c > bestC) { bestC = c; bestKey = k; }
+  return bestKey ? { key: bestKey, c: bestC } : null;
+}
+
+// 하위호환 래퍼(부위 키만) — 트래킹 펄스 링 등에서 사용.
+export function absWorst(m, ref) {
+  return absDominant(m, ref)?.key ?? null;
 }
 
 // ── 트래킹 고스트 가이드용 2D 기하 (판정과 무관, 렌더 전용) ──
