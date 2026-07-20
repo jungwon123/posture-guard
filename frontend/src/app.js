@@ -1393,7 +1393,7 @@ els.btnNotify.onclick = async () => {
 };
 els.btnPip.onclick = togglePip;
 els.btnReport.onclick = openReport;
-$("fab-stats")?.addEventListener("click", openReport); // 하단 고정 통계 바로가기(스크롤 없이 리포트)
+// #fab-stats(통계)는 React(App.jsx)가 차트·기록 시트를 여는 걸로 배선함 — 엔진에서 중복 배선 금지.
 els.btnFace.onclick = () => {
   const hidden = els.camPanel.classList.toggle("face-hidden");
   els.btnFace.textContent = hidden ? "얼굴 보이기" : "얼굴 가리기";

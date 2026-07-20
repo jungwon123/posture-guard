@@ -266,8 +266,47 @@
   transform: scale(1.12) translateY(-1px);
 }
 #bottom-nav button:active .nav-ic { transform: scale(.94); }
+/* 설정 탭 이모지 아이콘 — 이미지 아이콘과 같은 슬롯 크기 */
+.nav-ic-emoji { width: 30px; height: 30px; font-size: 23px; line-height: 30px; text-align: center;
+  filter: opacity(.72); transition: transform .15s, filter .15s; }
+#bottom-nav button.on .nav-ic-emoji { filter: none; transform: scale(1.12) translateY(-1px); }
 #report-overlay { z-index: 60; }
 #install-banner { bottom: 76px; }
+
+/* 페이지 제목 (설정 등) */
+.page-title { font-size: 18px; font-weight: 800; letter-spacing: -.02em; padding: 16px 16px 4px; }
+
+/* ── 통계 시트 ([통계] 버튼으로 열림 — 차트·기록) ── */
+#stats-overlay {
+  position: fixed; inset: 0; z-index: 62; display: none;
+  background: rgba(12, 16, 24,.55); justify-content: center; align-items: flex-end;
+}
+#stats-overlay.open { display: flex; }
+@media (min-width: 600px) { #stats-overlay { max-width: 430px; margin-inline: auto; align-items: center; } }
+.stats-sheet {
+  background: var(--bg); width: 100%; max-width: 430px; max-height: 88vh; overflow-y: auto;
+  border-radius: 18px 18px 0 0; border: 1px solid var(--line); padding-bottom: 20px;
+  animation: sheetUp .26s ease;
+}
+@media (min-width: 600px) { .stats-sheet { border-radius: 18px; max-height: 84vh; } }
+@keyframes sheetUp { from { transform: translateY(24px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .stats-sheet { animation: none; } }
+.stats-head {
+  position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px 10px; background: var(--bg); border-bottom: 1px solid var(--line);
+}
+.stats-head b { font-size: 16px; font-weight: 800; }
+.stats-close { background: var(--panel); border: 1px solid var(--line); border-radius: 999px;
+  width: 30px; height: 30px; padding: 0; color: var(--dim); font-size: 15px; }
+.stats-sheet .chart-card { border: none; margin: 0; }
+
+/* ── 로그인 게이트 (앱 시작 화면) ── */
+.login-gate {
+  position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center;
+  padding: 20px; background: var(--bg); overflow-y: auto;
+}
+@media (min-width: 600px) { .login-gate { max-width: 430px; margin-inline: auto; } }
+.login-gate .login-card { width: 100%; max-width: 380px; }
 
 /* ── 요정 UI 에셋 (숲 배경 · 페이지 배너 · 버튼) ── */
 #app-bg {
