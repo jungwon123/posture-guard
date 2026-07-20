@@ -1,9 +1,9 @@
-// 캐릭터 페이지 — 현재 장착 캐릭터 미리보기 + 보유 스킨/테마 장착 (select는 엔진이 관리)
+// 캐릭터 페이지 — 현재 장착 캐릭터 미리보기 + 보유 스킨 장착 (그리드는 엔진이 관리)
 import { useEffect, useState } from "react";
-import { SKINS, THEMES } from "../reward.js";
+import { SKINS } from "../reward.js";
 
 function readShop() {
-  return { owned: [], skin: "fairy", theme: "green", ...JSON.parse(localStorage.getItem("pg_shop") || "{}") };
+  return { owned: [], skin: "fairy", ...JSON.parse(localStorage.getItem("pg_shop") || "{}") };
 }
 
 export default function CharacterPage() {
@@ -14,7 +14,6 @@ export default function CharacterPage() {
   }, []);
 
   const skin = SKINS[shop.skin] || SKINS.fairy;
-  const theme = THEMES[shop.theme] || THEMES.green;
 
   return (
     <>
@@ -27,12 +26,11 @@ export default function CharacterPage() {
           <div className="char-preview-emoji">{skin.good}</div>
         )}
         <b>{skin.label}</b>
-        <span className="hint">테마: {theme.label}</span>
       </div>
       <details id="character-equip" open>
         <summary>🎽 갈아입히기</summary>
         <div id="equip-grid" className="equip-grid"></div>
-        <p className="hint">보유한 요정·테마를 눌러 바로 갈아입어요. 새 스킨은 [상점]에서 포인트로 살 수 있어요.</p>
+        <p className="hint">보유한 요정을 눌러 바로 갈아입어요. 새 요정은 [상점]에서 포인트로 살 수 있어요.</p>
       </details>
     </>
   );

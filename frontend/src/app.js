@@ -7,7 +7,7 @@ import {
 // 3D 절대 지표 레이어 — 개인 z-score 위에 "거리에 강한 + 절대 바른자세" 게이트를 얹는다(core 무수정).
 import { AbsSmoother, extractAbsolute, finishAbsRef, absPenalty, absWorst, headPoseFromMatrix,
   extractGuidePoints, finishGuide, projectGuide } from "./posture3d.js";
-import { Rewards, MELODIES, SKINS, THEMES, SHOP, TIERS, computeReport } from "./reward.js";
+import { Rewards, MELODIES, SKINS, SHOP, TIERS, computeReport } from "./reward.js";
 
 // React 마운트 후 1회 실행 (엔진 계층 — 카메라 루프·판정·알림·PiP)
 let __started = false;
@@ -943,7 +943,7 @@ function buyItem(item) {
   const r = rewards.buy(item.id);
   els.msg.textContent = r.msg;
   if (r.ok) {
-    renderShop(); applyTheme(); flashPoints();
+    renderShop(); flashPoints();
     rewardUntil = nowSec() + 2.5; // "보상 받았어요!" 모션
     updateFairyVisual(sm.state, false, nowSec(), rewards.fairy(sm.state, 0, false));
   }
@@ -979,28 +979,6 @@ function renderShop() {
     sec.appendChild(grid);
     els.shopList.appendChild(sec);
   }
-  // 테마 색 (무료)
-  const themes = SHOP.filter((i) => i.type === "theme");
-  if (themes.length) {
-    const sec = document.createElement("div");
-    sec.className = "tier tier-theme";
-    sec.innerHTML = `<div class="tier-head"><b>테마 색</b><span>무료 · 강조색 바꾸기</span></div>`;
-    const grid = document.createElement("div");
-    grid.className = "tier-grid";
-    for (const item of themes) {
-      const owned = rewards.shop.owned.includes(item.id);
-      const card = document.createElement("div");
-      card.className = "skin-card";
-      const color = THEMES[item.key]?.accent || "#5abe5a";
-      card.innerHTML = `<div class="theme-swatch" style="background:${color}"></div>` +
-        `<div class="skin-name">${item.label}</div>` +
-        `<div class="skin-action">${owned ? '<span class="owned-tag">✓ 보유</span>' : '<button class="buy-btn">받기</button>'}</div>`;
-      if (!owned) card.querySelector(".buy-btn").onclick = () => buyItem(item);
-      grid.appendChild(card);
-    }
-    sec.appendChild(grid);
-    els.shopList.appendChild(sec);
-  }
   renderEquip(); // 캐릭터 페이지 보유 목록 그리드
 }
 // 캐릭터 페이지 — 보유한 요정/테마를 그리드로 보여주고 눌러서 바로 장착 (상점 카드처럼)
@@ -1017,20 +995,9 @@ function renderEquip() {
       ${thumb}<span class="equip-name">${sk.label}</span>
       ${on ? '<span class="equip-badge">장착 중</span>' : ""}</button>`;
   };
-  const themeChip = (k) => {
-    const th = THEMES[k] || THEMES.green;
-    const on = rewards.shop.theme === k;
-    return `<button class="equip-theme${on ? " on" : ""}" data-type="theme" data-key="${k}" title="${th.label}">
-      <span class="equip-sw" style="background:${th.accent}"></span><span>${th.label}</span></button>`;
-  };
   grid.innerHTML =
     `<div class="equip-sec-t">요정 (${rewards.ownedOf("skin").length})</div>` +
-    `<div class="equip-cards">${rewards.ownedOf("skin").map(skinCard).join("")}</div>` +
-    `<div class="equip-sec-t">테마 색</div>` +
-    `<div class="equip-themes">${rewards.ownedOf("theme").map(themeChip).join("")}</div>`;
-}
-function applyTheme() {
-  document.documentElement.style.setProperty("--accent", rewards.accent());
+    `<div class="equip-cards">${rewards.ownedOf("skin").map(skinCard).join("")}</div>`;
 }
 
 // ── 그룹 랭킹 (백엔드 1단계 — 로그인 없음: 익명 기기 ID + 닉네임, docs/백엔드-설계.md) ──
@@ -1303,17 +1270,15 @@ $("btn-report-close").onclick = () => els.reportOverlay.classList.remove("open")
 els.reportOverlay.onclick = (e) => { if (e.target === els.reportOverlay) els.reportOverlay.classList.remove("open"); };
 // 보유 목록 그리드 — 카드 클릭으로 즉시 장착 (이벤트 위임: innerHTML 재렌더에도 유지)
 $("equip-grid")?.addEventListener("click", (e) => {
-  const b = e.target.closest(".equip-card, .equip-theme");
+  const b = e.target.closest(".equip-card");
   if (!b) return;
   rewards.apply(b.dataset.type, b.dataset.key);
-  if (b.dataset.type === "theme") applyTheme();
   renderEquip();
 });
 
 // ── 초기화 ──
 initSettings();
 renderShop();
-applyTheme();
 renderSummary();
 els.points.textContent = `🪙 ${rewards.points}P`;
 updateFairyVisual(sm.state, false, nowSec(), rewards.fairy(sm.state, 0, false));

@@ -37,12 +37,6 @@ export const TIERS = [
   { id: "premium", label: "프리미엄", sub: "단 하나뿐인 빛" },
 ];
 
-export const THEMES = {
-  green:  { label: "기본 초록", accent: "#5abe5a" },
-  purple: { label: "보라", accent: "#9678c8" },
-  blue:   { label: "파랑", accent: "#4c8dff" },
-};
-
 export const SHOP = [
   // 레어
   { id: "skin_blue",   type: "skin", key: "blue",   label: "파랑 요정", tier: "rare", price: 500 },
@@ -56,9 +50,6 @@ export const SHOP = [
   { id: "skin_strawberry", type: "skin", key: "strawberry", label: "딸기 디저트 요정", tier: "premium", price: 8000 },
   { id: "skin_ocean",      type: "skin", key: "ocean",      label: "바다 요정",       tier: "premium", price: 10000 },
   { id: "skin_idol",       type: "skin", key: "idol",       label: "아이돌 요정",     tier: "premium", price: 12000 },
-  // 테마 색 (무료 커스텀)
-  { id: "theme_purple", type: "theme", key: "purple", label: "보라", price: 0 },
-  { id: "theme_blue",   type: "theme", key: "blue",   label: "파랑", price: 0 },
 ];
 
 export const DEFAULT_SETTINGS = {
@@ -77,7 +68,7 @@ export class Rewards {
     this.s = storage;
     this.points = +(storage.getItem("pg_points") || 0);
     this.settings = { ...DEFAULT_SETTINGS, ...JSON.parse(storage.getItem("pg_settings") || "{}") };
-    this.shop = { owned: [], skin: "fairy", theme: "green", ...JSON.parse(storage.getItem("pg_shop") || "{}") };
+    this.shop = { owned: [], skin: "fairy", ...JSON.parse(storage.getItem("pg_shop") || "{}") };
     this.today = JSON.parse(storage.getItem("pg_today") || "null") || { date: "", earned: 0 };
     this.goodAcc = 0;
     this.lastTick = null;
@@ -131,17 +122,15 @@ export class Rewards {
     this.shop.owned.push(itemId);
     // 사자마자 적용
     if (item.type === "skin") this.shop.skin = item.key;
-    if (item.type === "theme") this.shop.theme = item.key;
     this._save();
     return { ok: true, msg: `${item.label} 구매 완료!` };
   }
   apply(type, key) {
     if (type === "skin" && (key === "fairy" || this.shop.owned.some((id) => SHOP.find((i) => i.id === id)?.key === key))) this.shop.skin = key;
-    if (type === "theme" && (key === "green" || this.shop.owned.some((id) => SHOP.find((i) => i.id === id)?.key === key))) this.shop.theme = key;
     this._save();
   }
   ownedOf(type) {
-    const base = type === "skin" ? ["fairy"] : ["green"];
+    const base = type === "skin" ? ["fairy"] : [];
     return base.concat(SHOP.filter((i) => i.type === type && this.shop.owned.includes(i.id)).map((i) => i.key));
   }
 
@@ -154,7 +143,6 @@ export class Rewards {
     if (badCandidate) return skin.warn;
     return skin.good;
   }
-  accent() { return (THEMES[this.shop.theme] || THEMES.green).accent; }
 }
 
 // 오늘 리포트 — 상태 전이 기록(events)에서 계산. 순수 함수.

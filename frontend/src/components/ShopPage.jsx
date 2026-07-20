@@ -1,4 +1,4 @@
-// 상점 페이지 — 상단 보유 포인트 + 스킨·테마 구매 (목록은 엔진이 #shop-list에 렌더)
+// 상점 페이지 — 상단 보유 포인트 + 스킨 구매 (목록은 엔진이 #shop-list에 렌더)
 import { useEffect, useState } from "react";
 
 export default function ShopPage() {
@@ -17,7 +17,7 @@ export default function ShopPage() {
         <span className="hint">바른 자세 1분 = 1P · 출석 +10P</span>
       </div>
       <details id="shop" open>
-        <summary>🛍️ 스킨 · 테마 구매</summary>
+        <summary>🛍️ 요정 스킨 구매</summary>
         <div id="shop-list"></div>
         <p className="hint">산 스킨은 [캐릭터] 페이지에서 갈아입힐 수 있어요.</p>
       </details>
