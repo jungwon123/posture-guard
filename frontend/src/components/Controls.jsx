@@ -4,7 +4,7 @@ export default function Controls() {
     <>
       <div id="controls">
         <button id="btn-start" className="primary">카메라 시작</button>
-        <button id="btn-calib" disabled title="가장 바른 자세로 앉아 5초간 유지하세요 — 이 자세가 '정답 기준'이 됩니다">바른자세 기준 등록 (5초)</button>
+        <button id="btn-calib" disabled title="편하게 유지할 수 있는 바른 자세로 앉아 5초간 유지하세요 — 이 자세가 '정답 기준'이 됩니다">바른자세 기준 등록 (5초)</button>
         <button id="btn-notify">알림 허용</button>
         <button id="btn-pip" disabled>미니 모드 (PiP)</button>
         <button id="btn-face">얼굴 가리기</button>

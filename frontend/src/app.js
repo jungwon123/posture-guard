@@ -29,6 +29,9 @@ const els = {
   setVibrate: $("set-vibrate"),
   btnTest: $("btn-test"), shopList: $("shop-list"),
   blink: $("blink"), setBlink: $("set-blink"), blinkStatus: $("blink-status"),
+  startCta: $("start-cta"), btnStartHero: $("btn-start-hero"),
+  calibGuide: $("calib-guide"), calibCount: $("calib-count"),
+  awayNotice: $("away-notice"), centerPop: $("center-pop"), centerPopCard: $("center-pop-card"),
 };
 
 const STATE_COLOR = { GOOD: "#5abe5a", BAD: "#e64545", AWAY: "#a0a0a0", UNCALIBRATED: "#e6aa3c" };
@@ -96,6 +99,10 @@ let absCalibSamples = [];            // 캘리브 중 절대 지표 수집
 let lastAbs = null;                  // 최근 절대 지표(트래킹 수치 표시용)
 let guideRef = null;                 // 트래킹 고스트 가이드(바른 머리위치, 어깨프레임)
 let guideCalibSamples = [];          // 캘리브 중 가이드 좌표 수집
+let camRef = null;                   // 캘리브 시점 카메라 프레이밍(어깨너비·어깨중심Y, 이미지 정규좌표) — 카메라 이동 감지 기준
+let camCalibSamples = [];            // 캘리브 중 프레이밍 수집
+let camMoveHits = 0;                 // 프레이밍이 크게 어긋난 연속 틱 수
+let lastCamWarn = 0;                 // 마지막 '카메라 위치 바뀜' 안내 시각(초) — 도배 방지
 let escFired = false;
 let lastDetect = 0;
 let lastActiveSec = +(localStorage.getItem("pg_last_active") || 0); // 마지막 실제 감지 틱 시각(초). 세션 간 유지 → 재로드 시 열린 세그먼트 무한연장 방지.
@@ -142,7 +149,33 @@ let faceSeenAt = 0;            // 마지막으로 얼굴이 잡힌 시각(초) �
 const FACE_HEAD_GAP = 180;     // 머리자세용 얼굴 추론 최소 간격(ms) ≈ 5.5Hz (폰 부담 완화)
 
 const profile = store.loadProfile();
-if (profile) { judge = new Judge(profile); sm.state = "GOOD"; absRef = profile.absRef || null; guideRef = profile.guide || null; }
+if (profile) { judge = new Judge(profile); sm.state = "GOOD"; absRef = profile.absRef || null; guideRef = profile.guide || null; camRef = profile.camFrame || null; }
+
+// 카메라 프레이밍 지표(이미지 정규좌표) — 어깨너비·어깨중심Y. 자세보다 카메라 위치/거리 변화에 민감.
+function camFrameOf(lms) {
+  const a = lms[11], b = lms[12];
+  if (!a || !b || (a.visibility ?? 1) < 0.5 || (b.visibility ?? 1) < 0.5) return null;
+  return { shW: Math.hypot(a.x - b.x, a.y - b.y), shY: (a.y + b.y) / 2 };
+}
+function camFrameMedian(samples) {
+  if (!samples || samples.length < 5) return null;
+  const med = (arr) => { const s = [...arr].sort((x, y) => x - y); return s[Math.floor(s.length / 2)]; };
+  return { shW: med(samples.map((s) => s.shW)), shY: med(samples.map((s) => s.shY)) };
+}
+// 측정 중 카메라가 크게 움직였는지 — 어깨너비 30%+ 또는 어깨중심 세로 0.15+ 지속 변화면 재등록 안내
+function checkCameraMoved(now) {
+  if (!camRef || !running || calibUntil !== null || !judge) { camMoveHits = 0; return; }
+  const cur = lastResult && camFrameOf(lastResult.landmarks?.[0] || []);
+  if (!cur) { camMoveHits = 0; return; }
+  const wOff = Math.abs(cur.shW - camRef.shW) / camRef.shW;
+  const yOff = Math.abs(cur.shY - camRef.shY);
+  if (wOff > 0.30 || yOff > 0.15) camMoveHits++; else camMoveHits = Math.max(0, camMoveHits - 2);
+  if (camMoveHits >= 25 && now - lastCamWarn > 45) { // ~2.5초(10Hz) 지속 + 45초 쿨다운
+    lastCamWarn = now; camMoveHits = 0;
+    const m = "카메라 위치가 바뀐 것 같아요 — 위치를 조정하거나 [기준 다시 잡기]를 눌러 주세요";
+    showToast(m); speak("카메라가 움직였나요? 🎥");
+  }
+}
 
 // ── 알림 (소리·진동·노래는 reward.js 설정을 따름) ──
 // 화면 안 배너 — 아이폰(WebKit)처럼 Notification 미지원/미허용일 때의 대체 채널
@@ -277,10 +310,13 @@ async function start() {
     return;
   }
   running = true;
-  els.btnStart.textContent = "카메라 끄기";
+  els.btnStart.textContent = "측정 종료";
+  els.btnStart.classList.add("danger"); // 측정 중엔 종료 버튼임을 색으로 분명히
   els.btnStart.disabled = false;
   els.btnCalib.disabled = false;
+  els.btnCalib.textContent = judge ? "기준 다시 잡기" : "바른자세 기준 등록 (5초)";
   els.btnPip.disabled = false;
+  updateOverlays(sm.state); // 시작 CTA 숨기고, 미등록이면 [기준 등록] 강조
   if (rewards.attend(dateStr())) {
     els.msg.textContent = "출석 +10P! " + (judge ? "감지 중 (저장된 기준 사용)." : "바르게 앉은 뒤 [기준 등록]을 누르세요.");
     flashPoints();
@@ -312,13 +348,35 @@ function stop() {
   if (s) { s.getTracks().forEach((t) => t.stop()); els.cam.srcObject = null; }
   blinkSampling = false;
   els.btnStart.textContent = "카메라 시작";
+  els.btnStart.classList.remove("danger");
   els.btnCalib.disabled = true;
+  els.btnCalib.classList.remove("pulse");
   els.pill.textContent = "꺼짐";
   els.pill.style.background = "#555";
   els.score.textContent = "score --";
-  els.msg.textContent = "카메라를 껐어요. 다시 켜려면 [카메라 시작]을 누르세요.";
+  els.msg.textContent = "측정이 종료되고 카메라가 꺼졌어요. 다시 켜려면 [카메라 시작]을 누르세요.";
   const ctx = els.track.getContext("2d"); // TRACKING 지우기
   ctx.clearRect(0, 0, els.track.width, els.track.height);
+  updateOverlays("AWAY"); // 시작 CTA 다시 표시, 자리비움/카운트다운 숨김
+  showSessionSummary();   // 종료 직후 오늘 요약을 중앙에 크게
+}
+
+// 측정 종료 직후 — 오늘 사용 요약을 중앙 팝업으로 (QC: 종료 후 세션 요약 안내)
+function showSessionSummary() {
+  const rep = computeReport(events, dayStartSec(), nowSec());
+  if (rep.watched <= 5) { // 실사용이 거의 없으면 요약 생략
+    centerPop(`<div class="cp-title">측정을 종료했어요</div>
+      <div class="cp-sub">카메라가 꺼졌습니다. 수고했어요!</div>`, 2600);
+    return;
+  }
+  const ratio = rep.ratio !== null ? `${Math.round(rep.ratio * 100)}%` : "—";
+  centerPop(`<div class="cp-title">오늘 측정을 종료했어요</div>
+    <div class="cp-summary">
+      <div class="cp-stat"><b>${(rep.good / 60).toFixed(0)}분</b><span>바른 자세</span></div>
+      <div class="cp-stat"><b>${ratio}</b><span>바름 비율</span></div>
+      <div class="cp-stat"><b>${(rep.watched / 60).toFixed(0)}분</b><span>총 시간</span></div>
+    </div>
+    <div class="cp-sub">카메라가 꺼졌습니다 · 자세히 보려면 [오늘 리포트]</div>`, 3600);
 }
 
 // ── 얼굴 모델 로드 (머리자세 판정 + 눈 깜빡임 공용) ──
@@ -416,6 +474,28 @@ function processBlink(now) {
   }
 }
 
+// ── 화면 오버레이 (시작 CTA·등록 카운트다운·자리비움) ──
+// 카메라 켜짐/캘리브/자리비움 상태에 맞춰 큰 안내를 겹쳐 보여준다(QC 피드백: 첫 화면·등록 길잡이).
+function show(el, on) { if (el) el.style.display = on ? "flex" : "none"; }
+function updateOverlays(state) {
+  const calibrating = calibUntil !== null;
+  show(els.startCta, !running);                                    // 시작 전 — 큰 시작 버튼
+  show(els.calibGuide, calibrating);                               // 등록 중 — 자세 안내 + 카운트다운
+  show(els.awayNotice, running && !calibrating && state === "AWAY"); // 자리 비움 — 측정 멈춤 안내
+  // 등록 전 다음 할 일 강조 — 아직 기준이 없으면 [기준 등록] 버튼을 맥동시켜 시선을 끈다
+  els.btnCalib.classList.toggle("pulse", running && !calibrating && !judge);
+}
+
+// 중앙 팝업 — 등록 완료·측정 종료 등 놓치면 안 되는 안내를 화면 중앙에 크게 (2~3초)
+let centerPopTimer = null;
+function centerPop(html, ms = 2600) {
+  if (!els.centerPop) return;
+  els.centerPopCard.innerHTML = html;
+  els.centerPop.classList.add("show");
+  clearTimeout(centerPopTimer);
+  if (ms > 0) centerPopTimer = setTimeout(() => els.centerPop.classList.remove("show"), ms);
+}
+
 // 캐릭터 말풍선 — 요정이 잠깐 말한다 (전이·이벤트 시)
 let speechTimer = null;
 function speak(text, ms = 4000) {
@@ -442,7 +522,7 @@ function tick() {
     }
     lastActiveSec = now;
     if (now - lastActivePersist > 3) { try { localStorage.setItem("pg_last_active", String(Math.round(now))); } catch {} lastActivePersist = now; }
-    let sig = null, absM = null, guideSample = null;
+    let sig = null, absM = null, guideSample = null, camSample = null;
     lastFaceFr = null; // pose detect가 throw해도 blink가 이전 틱 프레임을 재소비하지 않도록
     try {
       lastResult = landmarker.detectForVideo(els.cam, wallMs);
@@ -451,6 +531,7 @@ function tick() {
         const raw = extractSignals(lms);
         if (raw) sig = smoother.update(raw);
         guideSample = extractGuidePoints(lms); // 트래킹 가이드 캡처용(어깨프레임 머리위치)
+        camSample = camFrameOf(lms);           // 카메라 이동 감지 기준(어깨너비·중심Y)
       }
       runFace(now, wallMs); // 얼굴 추론 1회(머리자세 + blink 공유) → faceHead 갱신
       // 3D 절대 지표(미터 world 좌표, 추가 추론비용 0) + 얼굴 머리 pitch(있으면). 없으면 null
@@ -467,31 +548,46 @@ function tick() {
       if (sig) calibSamples.push(sig);
       if (absM) absCalibSamples.push(absM);
       if (guideSample) guideCalibSamples.push(guideSample);
+      if (camSample) camCalibSamples.push(camSample);
       const remain = calibUntil - now;
-      els.msg.textContent = `바른자세 기준 등록 중… ${Math.max(0, remain).toFixed(1)}s — 귀·어깨 일직선, 화면은 눈높이, 등 펴기`;
+      els.calibCount.textContent = String(Math.max(0, Math.ceil(remain))); // 큰 카운트다운(오버레이)
+      els.msg.textContent = `바른자세 기준 등록 중… ${Math.max(0, remain).toFixed(1)}s — 허리를 펴고 정면을 바라봐 주세요`;
       if (remain <= 0) {
+        const wasRegistered = !!judge; // 재등록 여부 — 완료 문구 구분
         if (calibSamples.length >= 5) {
           const p = finishCalibration(calibSamples);
           const ref = finishAbsRef(absCalibSamples); // 이 "바른 자세"의 3D 절대 기준
           if (ref) p.absRef = ref;
           const g = finishGuide(guideCalibSamples); // 트래킹 고스트 가이드(바른 머리위치)
           if (g) p.guide = g;
+          const cf = camFrameMedian(camCalibSamples); // 카메라 프레이밍 기준(이동 감지용)
+          if (cf) p.camFrame = cf;
           store.saveProfile(p);
           absRef = ref;
           guideRef = g;
+          camRef = cf;
           judge = new Judge(p);
           smoother = new SignalSmoother();
           absSmoother = new AbsSmoother();
           sm = new StateMachine(); sm.state = "GOOD";
+          // 재등록 시 이전 경고·에스컬레이션 상태 초기화(사용 시간 기록은 유지)
+          escFired = false; praiseUntil = 0; rewardUntil = 0; camMoveHits = 0;
           logTransition(null, "GOOD", now);
+          els.btnCalib.textContent = "기준 다시 잡기";
+          els.btnCalib.classList.remove("pulse");
           els.msg.textContent = "기준 등록 완료. 척추요정이 깨어났어요!";
-          speak("준비 완료! 지켜볼게요 👀");
+          centerPop(wasRegistered
+            ? `<div class="cp-title">새 기준으로 다시 시작해요</div><div class="cp-sub">이전 경고는 초기화했어요 · 기록 시간은 그대로 이어져요</div>`
+            : `<div class="cp-title">기준 자세 등록 완료!</div><div class="cp-sub">이제 척추요정이 자세를 지켜봐요 👀</div>`, 2800);
+          speak(wasRegistered ? "새 기준으로 시작! 💚" : "준비 완료! 지켜볼게요 👀");
         } else {
           els.msg.textContent = "몸이 잘 안 잡혔어요. 다시 [기준 등록]을 눌러주세요.";
+          centerPop(`<div class="cp-title">등록에 실패했어요</div><div class="cp-sub">얼굴과 어깨가 보이게 앉은 뒤 다시 눌러 주세요</div>`, 2600);
         }
         calibUntil = null;
         absCalibSamples = [];
         guideCalibSamples = [];
+        camCalibSamples = [];
       }
     }
 
@@ -569,6 +665,8 @@ function tick() {
     // 포인트 적립 (GOOD 1분당 +1P)
     if (rewards.tick(state, now, dateStr()) > 0) { flashPoints(); rewardUntil = now + 2.5; speak("+1P! 🪙"); }
 
+    checkCameraMoved(now);   // 카메라 위치 크게 바뀌면 재등록 안내
+    updateOverlays(state);   // 시작 CTA·등록 카운트다운·자리비움 오버레이 갱신
     renderUI(state, score, zs, now, face);
   }
   if (!document.hidden) requestAnimationFrame(tick);
@@ -1267,10 +1365,14 @@ setInterval(() => { if ($("group").open) refreshLeaderboard(); }, 30_000); // �
 
 // ── 버튼 ──
 els.btnStart.onclick = () => { if (running) stop(); else start(); };
+if (els.btnStartHero) els.btnStartHero.onclick = () => { if (!running) start(); }; // 첫 화면 큰 시작 버튼
 els.btnCalib.onclick = () => {
+  if (!running) return;
   calibUntil = nowSec() + TUNING.CALIB_SECS;
-  calibSamples = []; absCalibSamples = []; guideCalibSamples = []; absSmoother = new AbsSmoother();
-  speak("바르게! 귀·어깨 일직선, 화면 눈높이 🧘");
+  calibSamples = []; absCalibSamples = []; guideCalibSamples = []; camCalibSamples = []; absSmoother = new AbsSmoother();
+  els.calibCount.textContent = String(TUNING.CALIB_SECS);
+  updateOverlays(sm.state); // 등록 안내 오버레이 즉시 표시
+  speak("허리를 펴고 정면을 봐요 🧘");
 };
 els.btnNotify.onclick = async () => {
   playNotes(MELODIES.sparkle.notes, rewards.settings.volume); // 사용자 제스처로 오디오 잠금 해제 (아이폰 필수 — 가장 먼저)
@@ -1283,6 +1385,7 @@ els.btnNotify.onclick = async () => {
 };
 els.btnPip.onclick = togglePip;
 els.btnReport.onclick = openReport;
+$("fab-stats")?.addEventListener("click", openReport); // 하단 고정 통계 바로가기(스크롤 없이 리포트)
 els.btnFace.onclick = () => {
   const hidden = els.camPanel.classList.toggle("face-hidden");
   els.btnFace.textContent = hidden ? "얼굴 보이기" : "얼굴 가리기";
@@ -1351,6 +1454,7 @@ if (new URLSearchParams(location.search).has("fwd")) {
 }
 els.points.textContent = `🪙 ${rewards.points}P`;
 updateFairyVisual(sm.state, false, nowSec(), rewards.fairy(sm.state, 0, false));
+updateOverlays("AWAY"); // 첫 화면 — 큰 [카메라 시작] CTA 표시
 
 // ── 배경 라이트/다크 토글 ──
 const themeBtn = $("theme-toggle");

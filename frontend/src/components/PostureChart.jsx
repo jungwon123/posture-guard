@@ -4,7 +4,7 @@
 import { useEffect, useState } from "react";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
-  BarChart, Bar, Cell, PieChart, Pie, ReferenceArea,
+  BarChart, Bar, Cell, PieChart, Pie, ReferenceArea, LabelList,
 } from "recharts";
 
 const nowSec = () => Date.now() / 1000;
@@ -25,9 +25,10 @@ function dayBounds(daysAgo) {
 const WD = ["일", "월", "화", "수", "목", "금", "토"];
 const fmtMin = (sec) => Math.round(sec / 60) + "분";
 
-// 상태 색 (명예의 전당과 동일 팔레트)
-const C_GOOD = "#6fe08a", C_BAD = "#ff7a7a", C_AWAY = "#9aa6c9", C_EMPTY = "#3a4260";
-const C_AMBER = "#ffd166";
+// 상태 색 (명예의 전당과 동일 팔레트). 좋음(초록)/보통(주황)은 색상만이 아니라
+// 막대 위 정확도 %와 범례 아이콘으로도 구분한다(색 대비 강화 + 색맹 접근성, QC #20).
+const C_GOOD = "#4fd07a", C_BAD = "#ff7a7a", C_AWAY = "#9aa6c9", C_EMPTY = "#3a4260";
+const C_AMBER = "#f59e2b"; // 초록과 확실히 구분되게 더 진한 주황
 const barColor = (acc, hasData) => (!hasData ? C_EMPTY : acc >= 70 ? C_GOOD : acc >= 40 ? C_AMBER : C_BAD);
 
 // 구간 [start,end]의 GOOD/BAD 누적·비율·최장 GOOD
@@ -229,10 +230,19 @@ export default function PostureChart() {
                         <Cell key={i} fill={barColor(x.acc, x.hasData)} fillOpacity={x.today ? 1 : 0.82}
                               stroke={x.today ? "var(--accent)" : "none"} strokeWidth={x.today ? 2 : 0} />
                       ))}
+                      {/* 색만이 아니라 숫자로도 정확도를 읽게 — 색맹 접근성 */}
+                      <LabelList dataKey="acc" position="top" content={(p) => {
+                        const x = d.daily[p.index];
+                        if (!x || !x.hasData) return null;
+                        return (
+                          <text x={+p.x + (+p.width) / 2} y={+p.y - 5} fill="var(--dim)"
+                                fontSize={10.5} fontWeight={700} textAnchor="middle">{x.acc}%</text>
+                        );
+                      }} />
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
-                <p className="hint">막대 색 = 그날 자세 정확도(🟢좋음 · 🟡보통 · 🔴주의). 테두리 있는 막대가 오늘이에요.</p>
+                <p className="hint">막대 위 숫자 = 그날 자세 정확도, 색으로도 표시(<b style={{ color: C_GOOD }}>■</b> 좋음 70%+ · <b style={{ color: C_AMBER }}>■</b> 보통 · <b style={{ color: C_BAD }}>■</b> 주의). 테두리 있는 막대가 오늘이에요.</p>
               </section>
             )}
 

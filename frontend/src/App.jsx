@@ -36,6 +36,7 @@ export default function App() {
         <PostureChart />
         <SettingsPanel />
         <EyeCarePanel />
+        <button id="fab-stats" title="오늘 통계 바로 보기" aria-label="오늘 통계 보기">📊 통계</button>
       </div>
 
       <div className="page" style={show("group")}>

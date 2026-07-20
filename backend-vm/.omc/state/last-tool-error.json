@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"cd /Users/jwon/Downloads/turtle/frontend && echo \\\"=== vercel link ===\\\" && cat .vercel/project.json 2>/dev/null; echo \\\"=== vercel version ===\\\"; which vercel && vercel --version 2>&1 | h...",
+  "error": "Exit code 1\n=== vercel link ===\n{\"projectId\":\"prj_VePHh0gjzCUJlNGDrfWwlKL5UpE6\",\"orgId\":\"team_TiwXcPSyI7dNY4otv8dPNsRp\",\"projectName\":\"posture-guard\"}=== vercel version ===\nvercel not found",
+  "timestamp": "2026-07-20T04:41:44.908Z",
+  "retry_count": 2
+}

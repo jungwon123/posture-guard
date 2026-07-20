@@ -1,7 +1,7 @@
 {
-  "tool_name": "mcp__Claude_Browser__navigate",
-  "tool_input_preview": "{\"tabId\":\"seed\",\"url\":\"http://localhost:8137\"}",
-  "error": "navigation to http://localhost:8137 was denied or failed",
-  "timestamp": "2026-07-17T19:38:15.125Z",
+  "tool_name": "mcp__Claude_Browser__computer",
+  "tool_input_preview": "{\"action\":\"scroll\",\"tabId\":\"seed\",\"coordinate\":[640,400],\"scroll_direction\":\"down\",\"scroll_amount\":6}",
+  "error": "computer timed out after 30s. The Browser pane may be stuck (modal dialog, navigation hang, or unresponsive renderer). Check preview_console_logs for errors.",
+  "timestamp": "2026-07-20T03:31:00.794Z",
   "retry_count": 1
 }
