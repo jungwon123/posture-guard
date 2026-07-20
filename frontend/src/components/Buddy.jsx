@@ -21,6 +21,35 @@ const PRAISE = ["자세 완벽해요! ✨", "좋아요, 이대로! 💚", "허�
 const TIPS = ["바른 자세, 잊지 말아요~", "가끔 어깨도 쭉 펴줘요 🙆", "지금처럼 곧게, 좋아요 👍"];
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
 
+// 요정이 이동할 때 '샤랄라' 잔상 — 글라이드하는 동안 실제 위치를 rAF로 샘플링해 경로에 반짝이를 남기고 사라지게.
+const SPARK_COLORS = ["#8fd694", "#ffd76a", "#ffb3c8", "#bfe3ff"];
+function sparkleTrail(from, to) {
+  if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return; // 모션 최소화 존중
+  if (Math.hypot(to.left - from.left, to.top - from.top) < 40) return;         // 거의 안 움직이면 스킵
+  const el = document.querySelector(".buddy");
+  if (!el) return;
+  const start = performance.now(), DUR = 1050;
+  let last = -100;
+  const step = (t) => {
+    const el2 = document.querySelector(".buddy");
+    const elapsed = t - start;
+    if (!el2 || elapsed > DUR) return;
+    if (elapsed - last >= 65) {
+      last = elapsed;
+      const r = el2.getBoundingClientRect();
+      const s = document.createElement("div");
+      s.className = "buddy-spark";
+      s.style.left = (r.left + r.width / 2 + (Math.random() * 26 - 13)) + "px";
+      s.style.top = (r.top + r.height / 2 + (Math.random() * 26 - 13)) + "px";
+      s.style.setProperty("--spark", SPARK_COLORS[Math.floor(Math.random() * SPARK_COLORS.length)]);
+      document.body.appendChild(s);
+      setTimeout(() => s.remove(), 1000);
+    }
+    requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
 export default function Buddy() {
   const [hidden, setHidden] = useState(() => localStorage.getItem("pg_buddy_off") === "1");
   // 초기 위치도 폰 컬럼(PC=중앙 430px, 모바일=전체) 안으로 잡아 마운트 직후 깜빡임 방지
@@ -48,7 +77,7 @@ export default function Buddy() {
     };
     const showBubble = (t) => { bub.textContent = t; wrap.style.display = "block"; placeBubble(); };
     const hideBubble = () => { wrap.style.display = "none"; };
-    const setBoth = (p) => { cur = p; setPos(p); if (wrap.style.display !== "none") placeBubble(); R.current.lastMove = performance.now(); };
+    const setBoth = (p) => { const from = cur; cur = p; setPos(p); if (wrap.style.display !== "none") placeBubble(); R.current.lastMove = performance.now(); sparkleTrail(from, p); };
 
     // PC에서는 앱이 폰 폭(430px) 중앙 컬럼으로 보이므로, 도우미도 그 컬럼 안에서만 로밍
     const FRAME = 430;

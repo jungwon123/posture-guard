@@ -12,6 +12,7 @@
     display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
     padding: 12px 16px; border-bottom: 1px solid var(--line);
   }
+  .app-logo { width: 34px; height: 34px; border-radius: 9px; flex-shrink: 0; margin-right: -4px; }
   header h1 { font-size: 16px; margin: 0; }
   #fairy { font-size: 22px; }
   #fairy-img {
@@ -584,3 +585,17 @@
 .buddy-bubble::after { content: ""; position: absolute; bottom: 100%; left: 50%; margin-left: -7px;
   border: 7px solid transparent; border-bottom-color: #fff; }
 @media (prefers-reduced-motion: reduce) { .buddy { transition: none; } .buddy-img { animation: none; } }
+/* 요정 이동 잔상 '샤랄라' — 경로에 4각 별이 반짝 떴다 사라짐 */
+.buddy-spark {
+  position: fixed; z-index: 54; width: 15px; height: 15px; margin: -7px 0 0 -7px;
+  pointer-events: none; background: var(--spark, #ffd76a);
+  clip-path: polygon(50% 0%, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0% 50%, 40% 40%);
+  filter: drop-shadow(0 0 3px var(--spark)); opacity: 0;
+  animation: buddySpark 950ms ease-out forwards;
+}
+@keyframes buddySpark {
+  0%   { opacity: 0; transform: scale(.2) rotate(0deg); }
+  25%  { opacity: .95; transform: scale(1) rotate(35deg); }
+  100% { opacity: 0; transform: scale(.35) translateY(-12px) rotate(80deg); }
+}
+@media (prefers-reduced-motion: reduce) { .buddy-spark { display: none; } }

@@ -2,6 +2,7 @@
 export default function Header() {
   return (
     <header>
+      <img className="app-logo" src="/assets/ui/logo.png" alt="척추요정 로고" />
       <h1>척추요정</h1>
       <span id="fairy" title="척추요정">🥚</span>
       <img id="fairy-img" alt="척추요정" title="척추요정" />
