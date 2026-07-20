@@ -98,6 +98,9 @@ let guideRef = null;                 // 트래킹 고스트 가이드(바른 머
 let guideCalibSamples = [];          // 캘리브 중 가이드 좌표 수집
 let escFired = false;
 let lastDetect = 0;
+let lastActiveSec = +(localStorage.getItem("pg_last_active") || 0); // 마지막 실제 감지 틱 시각(초). 세션 간 유지 → 재로드 시 열린 세그먼트 무한연장 방지.
+let lastActivePersist = 0;
+const IDLE_GAP_SEC = 5;  // 틱 공백이 이보다 크면 백그라운드/절전 복귀로 보고 직전 세그먼트를 그 시점에 끊음.
 let lastResult = null;
 let events = store.loadEvents();
 
@@ -300,7 +303,10 @@ async function start() {
 
 // 카메라 끄기 — 웹캠 트랙을 정지해 카메라 불이 꺼지고 감지가 멈춘다.
 function stop() {
+  // 열린 GOOD/BAD 세그먼트를 지금 시점에 닫아, 정지 후에도 시간이 계속 누적되지 않게 함.
+  if (running && (sm.state === "GOOD" || sm.state === "BAD")) { logTransition(sm.state, "AWAY", nowSec()); sm.state = "AWAY"; }
   running = false;
+  uploadStats(); // 세그먼트 닫힌 뒤 최종 집계 1회
   window.__pgLive = { running: false }; // 도우미에게 카메라 꺼짐 알림
   const s = els.cam.srcObject;
   if (s) { s.getTracks().forEach((t) => t.stop()); els.cam.srcObject = null; }
@@ -429,6 +435,13 @@ function tick() {
   const minGap = document.hidden ? 950 : 100; // 보일 때 10Hz, 숨김 1Hz
   if (wallMs - lastDetect >= minGap && els.cam.readyState >= 2) {
     lastDetect = wallMs;
+    // 감지 공백(백그라운드·절전 복귀 등) → 직전 GOOD/BAD 세그먼트를 공백 시작점에서 끊어 유휴시간을 GOOD로 안 셈
+    if (lastActiveSec && now - lastActiveSec > IDLE_GAP_SEC) {
+      if (sm.state === "GOOD" || sm.state === "BAD") logTransition(sm.state, "AWAY", lastActiveSec);
+      sm.state = "AWAY";
+    }
+    lastActiveSec = now;
+    if (now - lastActivePersist > 3) { try { localStorage.setItem("pg_last_active", String(Math.round(now))); } catch {} lastActivePersist = now; }
     let sig = null, absM = null, guideSample = null;
     lastFaceFr = null; // pose detect가 throw해도 blink가 이전 틱 프레임을 재소비하지 않도록
     try {
@@ -1008,11 +1021,13 @@ const weekKey = () => {
 };
 function weeklyGoodSec() { // 이번 주 GOOD 누적 (상태 전이 기록에서 계산)
   const t0 = weekStart().getTime() / 1000, now = nowSec();
+  // 열린(마지막) 세그먼트는 '마지막 실제 감지 시각'까지만 — 백그라운드로 앱이 멈춰 있던 시간은 안 셈.
+  const openEnd = Math.min(now, lastActiveSec || now);
   let acc = 0;
   for (let i = 0; i < events.length; i++) {
     if (events[i].to !== "GOOD") continue;
     const start = Math.max(events[i].t, t0);
-    const end = i + 1 < events.length ? events[i + 1].t : now;
+    const end = i + 1 < events.length ? events[i + 1].t : openEnd;
     if (end > start) acc += end - start;
   }
   return Math.round(acc);
@@ -1027,8 +1042,7 @@ async function api(path, body) {
   return data;
 }
 async function uploadStats() {
-  const g = myGroup();
-  if (!g) return;
+  if (!myGroup() || document.hidden) return; // 백그라운드면 부풀려질 수 있는 값 업로드 방지
   try { await api("stats", { memberId, week: weekKey(), goodSec: weeklyGoodSec(), points: rewards.points, streak: attendStreak() }); } catch {}
 }
 async function refreshLeaderboard() {
