@@ -1102,22 +1102,16 @@ function statusOf(r) {
   if (r.state === "BAD") return { cls: "distracted", dot: "bad", label: "집중 이탈" };
   return { cls: "active", dot: "good", label: "활동 중" };
 }
-function nudgeBtn(r, online) {
-  return r.member_id === memberId ? "" :
-    `<button class="nudge-btn" data-mid="${r.member_id}" ${online ? "" : "disabled"} title="자세 펴라고 콕!">👉</button>`;
-}
 function podCard(r, rank) {
   if (!r) return `<div class="pod pod-${rank} empty"><div class="pod-rank">${rank}</div><div class="pod-name">—</div></div>`;
   const me = r.member_id === memberId;
   const s = statusOf(r);
-  const online = r.ago_sec != null && r.ago_sec <= 90;
   return `<div class="pod pod-${rank}${me ? " me" : ""}">
     <div class="pod-rank">${rank}</div>
     <div class="pod-ava-wrap"><img class="pod-ava" src="${avatarFor(r)}" onerror="${AVA_FALLBACK}" alt="요정"></div>
     <div class="pod-name">${esc(r.nickname)}${me ? " (나)" : ""}</div>
     <div class="pod-stat ${s.cls}"><span class="dot ${s.dot}"></span>${s.label}</div>
     <div class="pod-score">${(r.good_sec / 60).toFixed(0)}분 · ${r.points}P</div>
-    ${nudgeBtn(r, online)}
   </div>`;
 }
 function renderHallOfFame(rows, champions = []) {
@@ -1125,13 +1119,11 @@ function renderHallOfFame(rows, champions = []) {
   const rest = rows.slice(3).map((r, i) => {
     const me = r.member_id === memberId;
     const s = statusOf(r);
-    const online = r.ago_sec != null && r.ago_sec <= 90;
     return `<div class="hof-row${me ? " me" : ""}">
       <span class="hof-num">${i + 4}</span>
       <img class="hof-ava" src="${avatarFor(r)}" onerror="${AVA_FALLBACK}" alt="">
       <span class="hof-nick">${esc(r.nickname)}${me ? " (나)" : ""}</span>
       <span class="hof-status ${s.cls}"><span class="dot ${s.dot}"></span>${s.label}</span>
-      ${nudgeBtn(r, online)}
     </div>`;
   }).join("");
   return `<div class="hof">
@@ -1166,19 +1158,7 @@ function renderHofCards(rows, champions) {
       <div class="hof-card">${crownCard}</div>
     </div>${champs}`;
 }
-// 콕 버튼 (이벤트 위임 — 리더보드는 innerHTML로 갱신되므로)
-$("leaderboard").addEventListener("click", async (e) => {
-  const btn = e.target.closest(".nudge-btn");
-  if (!btn) return;
-  btn.disabled = true;
-  try {
-    await api("nudge", { fromId: memberId, toId: btn.dataset.mid });
-    showToast("👉 콕 보냈어요! 친구에게 알림이 갑니다");
-  } catch (err) {
-    showToast("콕 실패: " + err.message);
-  }
-  setTimeout(() => { btn.disabled = false; }, 60_000); // 분당 1회 제한과 맞춤
-});
+// 콕 찌르기는 실시간 그리드(친구 타일)에서만 — 랭킹에선 제거(1·2위 카드 높이 불일치 해소)
 $("btn-group-create").onclick = async () => {
   const name = $("group-name").value.trim();
   if (!name) { els.msg.textContent = "그룹 이름을 입력해주세요."; return; }
