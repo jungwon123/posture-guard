@@ -55,10 +55,14 @@ export function extractAbsolute(wlms) {
   const shoulderWidth = Math.hypot(sL.x - sR.x, sL.y - sR.y, sL.z - sR.z);
   if (shoulderWidth < 1e-4) return null;
   const earMidY = (eL.y + eR.y) / 2, shMidY = (sL.y + sR.y) / 2;
+  const earMidZ = (eL.z + eR.z) / 2, shMidZ = (sL.z + sR.z) / 2;
   // world y 는 아래 방향(+). 귀가 어깨보다 위 → shMidY > earMidY → headVertical > 0.
   const headVertical = (shMidY - earMidY) / shoulderWidth;
   const shoulderTilt = Math.atan2(Math.abs(sR.y - sL.y), Math.abs(sR.x - sL.x) + 1e-6) * 180 / Math.PI;
-  return { headVertical, shoulderTilt };
+  // headForward(거북목 전방이동): 어깨 대비 귀의 깊이(Z) 오프셋을 어깨너비로 정규화. Z는 단일카메라 추정치라
+  // 노이즈가 크므로 강한 One-Euro로 다룬다. 부호/방향(귀가 앞으로 갈 때 증가/감소)은 Phase1 실기기 로그로 확정.
+  const headForward = (shMidZ - earMidZ) / shoulderWidth;
+  return { headVertical, shoulderTilt, headForward };
 }
 
 // FaceLandmarker facialTransformationMatrixes[0].data = 16개 column-major 4x4 (R|t),
@@ -90,6 +94,7 @@ export class AbsSmoother {
       headVertical: new OneEuro({ minCutoff: 0.8, beta: 0.01 }),
       shoulderTilt: new OneEuro({ minCutoff: 0.8, beta: 0.01 }),
       headPitch: new OneEuro({ minCutoff: 0.8, beta: 0.02 }),
+      headForward: new OneEuro({ minCutoff: 0.5, beta: 0.005 }), // Z는 노이즈 커서 더 강하게 스무딩
     };
   }
   update(m, t) {
@@ -98,6 +103,9 @@ export class AbsSmoother {
       headVertical: this.f.headVertical.filter(m.headVertical, t),
       shoulderTilt: this.f.shoulderTilt.filter(m.shoulderTilt, t),
     };
+    if (m.headForward != null && Number.isFinite(m.headForward)) {
+      out.headForward = this.f.headForward.filter(m.headForward, t);
+    }
     if (m.headPitch != null && Number.isFinite(m.headPitch)) {
       out.headPitch = this.f.headPitch.filter(m.headPitch, t);
     }
@@ -123,6 +131,9 @@ export function finishAbsRef(samples) {
   // 얼굴 모델이 캘리브 동안 충분히 잡혔으면 머리 pitch 기준도 저장(없으면 pitch 게이트 off).
   const pitches = good.map((s) => s.headPitch).filter((v) => v != null && Number.isFinite(v));
   if (pitches.length >= Math.max(3, Math.floor(good.length * 0.3))) ref.headPitch = median(pitches);
+  // 전방머리 기준(Phase1: 측정만 — 판정엔 아직 미사용). 있으면 __pgLive 로 편차 로깅.
+  const fwds = good.map((s) => s.headForward).filter((v) => v != null && Number.isFinite(v));
+  if (fwds.length >= 3) ref.headForward = median(fwds);
   return ref;
 }
 

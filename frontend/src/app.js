@@ -499,7 +499,11 @@ function tick() {
     for (const k in zs) if (zs[k] > worstZ) { worstZ = zs[k]; worst = k; }
     if (!worst && absRef && absM) worst = absWorst(absM, absRef); // 2D가 못 짚으면 3D 절대 지표로
     window.__pgLive = { running: true, state, score, worst, dur, ts: now,
-      pitch: faceHead ? Math.round(faceHead.pitch) : null }; // 실기기 부호 확인·디버그용
+      pitch: faceHead ? Math.round(faceHead.pitch) : null, // 실기기 부호 확인·디버그용
+      // 전방머리(거북목) Phase1 검증용 — 측정값만(판정 미반영). 부호/유의성은 실기기 로그로 확정.
+      fwd: absM?.headForward != null ? +absM.headForward.toFixed(4) : null,
+      fwdRef: absRef?.headForward != null ? +absRef.headForward.toFixed(4) : null,
+      fwdDev: (absM?.headForward != null && absRef?.headForward != null) ? +(absM.headForward - absRef.headForward).toFixed(4) : null };
 
     if (state !== prev) {
       logTransition(prev, state, now);
@@ -1283,6 +1287,18 @@ $("equip-grid")?.addEventListener("click", (e) => {
 initSettings();
 renderShop();
 renderSummary();
+
+// 전방머리(headForward) 실기기 검증 오버레이 — URL 에 ?fwd=1 일 때만. 학생 화면엔 안 뜬다.
+// 사용법: 바른자세 기준 등록(캘리브) 후, 정자세 vs 거북목에서 Δ(현재-기준)가 유의미하게 갈리는지 관찰.
+if (new URLSearchParams(location.search).has("fwd")) {
+  const dbg = document.createElement("div");
+  dbg.style.cssText = "position:fixed;left:8px;top:8px;z-index:99999;background:rgba(0,0,0,.78);color:#5ec8e0;font:12px/1.55 ui-monospace,monospace;padding:7px 10px;border-radius:9px;white-space:pre;pointer-events:none";
+  document.body.appendChild(dbg);
+  setInterval(() => {
+    const L = window.__pgLive || {};
+    dbg.textContent = `headForward (거북목 Phase1)\n현재 : ${L.fwd ?? "-"}\n기준 : ${L.fwdRef ?? "-"}\nΔ    : ${L.fwdDev ?? "-"}\npitch: ${L.pitch ?? "-"}`;
+  }, 300);
+}
 els.points.textContent = `🪙 ${rewards.points}P`;
 updateFairyVisual(sm.state, false, nowSec(), rewards.fairy(sm.state, 0, false));
 
