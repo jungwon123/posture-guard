@@ -53,9 +53,10 @@ export default function App() {
         <CharacterPage />
       </div>
 
-      {/* 설정 페이지 — 하단 '설정' 탭. 알림·눈깜빡임 설정을 여기로 모음 */}
+      {/* 설정 페이지 — 하단 '설정' 탭. 출석·알림·눈깜빡임 설정을 여기로 모음 */}
       <div className="page" style={show("settings")}>
         <div className="page-title">설정</div>
+        <AttendanceCard />
         <SettingsPanel />
         <EyeCarePanel />
       </div>
