@@ -15,6 +15,8 @@ export default function GroupPanel() {
         <input type="text" id="group-nick" placeholder="닉네임" maxLength={12} style={{ width: "110px" }} />
         <button id="btn-group-join">참여하기</button>
       </div>
+      <p className="hint">여러 그룹에 동시에 들어갈 수 있어요 (예: 우리 반 + 스터디). 코드로 참여하면 아래에 칩으로 추가돼요.</p>
+      <div id="group-switcher" className="group-switcher"></div>
       <div id="group-info" className="hint"></div>
       <div id="leaderboard"></div>
       <p className="hint">

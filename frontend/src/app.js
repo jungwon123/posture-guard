@@ -1006,7 +1006,20 @@ const memberId = (() => {
   if (!id) { id = crypto.randomUUID(); localStorage.setItem("pg_member_id", id); }
   return id;
 })();
-const myGroup = () => JSON.parse(localStorage.getItem("pg_group") || "null");
+// ── 다중 그룹 ── 한 기기가 여러 그룹 참여. pg_group=활성 그룹(기존 코드 호환), pg_groups=전체 목록.
+const LS_ACTIVE = "pg_group", LS_GROUPS = "pg_groups";
+const myGroup = () => { try { return JSON.parse(localStorage.getItem(LS_ACTIVE) || "null"); } catch { return null; } };
+const myGroups = () => { try { return JSON.parse(localStorage.getItem(LS_GROUPS) || "[]") || []; } catch { return []; } };
+const saveGroups = (list) => localStorage.setItem(LS_GROUPS, JSON.stringify(list));
+function setActiveGroup(code) {
+  const g = myGroups().find((x) => x.code === code);
+  if (g) localStorage.setItem(LS_ACTIVE, JSON.stringify(g));
+  else localStorage.removeItem(LS_ACTIVE);
+}
+function upsertGroup(g) { saveGroups([...myGroups().filter((x) => x.code !== g.code), g]); }
+function removeGroup(code) { saveGroups(myGroups().filter((x) => x.code !== code)); }
+// 마이그레이션: 예전 단일 pg_group만 있고 목록이 비면 목록으로 승격
+(() => { if (!myGroups().length) { const g = myGroup(); if (g && g.code) saveGroups([g]); } })();
 
 function weekStart() { // 이번 주 월요일 00:00
   const d = new Date();
@@ -1181,12 +1194,61 @@ $("btn-group-join").onclick = async () => {
   if (!code || !nickname) { els.msg.textContent = "코드와 닉네임을 입력해주세요."; return; }
   try {
     const { name } = await api("join", { code, nickname, memberId });
-    localStorage.setItem("pg_group", JSON.stringify({ code, name, nickname }));
+    upsertGroup({ code, name, nickname });  // 목록에 추가(다른 그룹 유지)
+    setActiveGroup(code);                    // 방금 들어간 그룹을 활성으로
+    renderGroupSwitcher();
     els.msg.textContent = `"${name}" 그룹 참여 완료!`;
     await uploadStats();
     refreshLeaderboard();
   } catch (e) { els.msg.textContent = "참여 실패: " + e.message; }
 };
+// ── 그룹 스위처(칩) 렌더 + 전환/나가기 ──
+function renderGroupSwitcher() {
+  const el = $("group-switcher");
+  if (!el) return;
+  const list = myGroups(), active = myGroup();
+  if (!list.length) { el.innerHTML = ""; return; }
+  el.innerHTML = `<div class="gs-label">내 그룹 ${list.length}개 · 탭해서 전환</div>` +
+    `<div class="gs-chips">` + list.map((g) => {
+      const on = active && active.code === g.code;
+      return `<span class="gs-chip${on ? " active" : ""}" data-code="${g.code}">` +
+        `<span class="gs-name">${esc(g.name)}</span>` +
+        `<span class="gs-x" data-leave="${g.code}" title="나가기">✕</span></span>`;
+    }).join("") + `</div>`;
+}
+$("group-switcher")?.addEventListener("click", async (e) => {
+  const x = e.target.closest(".gs-x");
+  if (x) { // 나가기
+    e.stopPropagation();
+    const code = x.dataset.leave, g = myGroups().find((v) => v.code === code);
+    if (!confirm(`'${g ? g.name : code}' 그룹에서 나갈까요?`)) return;
+    try { await api("leave", { memberId, code }); } catch {}
+    removeGroup(code);
+    if (myGroup()?.code === code) { const rest = myGroups(); setActiveGroup(rest.length ? rest[0].code : null); }
+    renderGroupSwitcher();
+    refreshLeaderboard();
+    return;
+  }
+  const chip = e.target.closest(".gs-chip");
+  if (!chip || myGroup()?.code === chip.dataset.code) return; // 이미 활성이면 무시
+  setActiveGroup(chip.dataset.code);
+  renderGroupSwitcher();
+  await uploadStats();
+  refreshLeaderboard();
+});
+// 서버 진실과 목록 동기화(다른 기기·초기화 대비) — 백엔드 미배포면 조용히 무시
+async function reconcileGroups() {
+  try {
+    const { groups } = await api(`my-groups?memberId=${memberId}`);
+    if (!Array.isArray(groups)) return;
+    saveGroups(groups);
+    const act = myGroup();
+    if (groups.length) setActiveGroup(act && groups.find((g) => g.code === act.code) ? act.code : groups[0].code);
+    else setActiveGroup(null);
+    renderGroupSwitcher();
+    refreshLeaderboard();
+  } catch {}
+}
 $("group").addEventListener("toggle", () => { if ($("group").open) { uploadStats().then(refreshLeaderboard); } });
 setInterval(uploadStats, 5 * 60 * 1000); // 5분마다 집계 업로드
 
@@ -1207,7 +1269,9 @@ async function pollNudges() {
 }
 setInterval(uploadPresence, 30_000);
 setInterval(pollNudges, 30_000);
-refreshLeaderboard(); // 그룹 페이지는 기본 열림 — 첫 로드 시 표시
+renderGroupSwitcher();  // 로컬 목록으로 즉시 칩 표시
+refreshLeaderboard();   // 그룹 페이지는 기본 열림 — 첫 로드 시 표시
+reconcileGroups();      // 서버 목록과 동기화(비동기)
 setInterval(() => { if ($("group").open) refreshLeaderboard(); }, 30_000); // 상태 점 주기 갱신
 
 // ── 리플레이 검증 ──

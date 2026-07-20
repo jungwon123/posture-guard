@@ -32,8 +32,17 @@ await pool.query(`
     group_id INT NOT NULL, week TEXT NOT NULL,
     member_id TEXT, nickname TEXT NOT NULL, good_sec INT NOT NULL DEFAULT 0,
     updated_at TIMESTAMPTZ DEFAULT now(), PRIMARY KEY (group_id, week));
+  -- 한 기기(member)가 여러 그룹에 동시 참여 (N:N). 그룹별 닉네임 허용.
+  CREATE TABLE IF NOT EXISTS memberships (
+    member_id TEXT REFERENCES members(id), group_id INT REFERENCES groups(id),
+    nickname TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT now(),
+    PRIMARY KEY (member_id, group_id));
   ALTER TABLE presence ADD COLUMN IF NOT EXISTS skin TEXT NOT NULL DEFAULT 'fairy';
   ALTER TABLE weekly_stats ADD COLUMN IF NOT EXISTS streak INT NOT NULL DEFAULT 0;
+  -- 레거시 members.group_id(1:1) → memberships 백필 (멱등)
+  INSERT INTO memberships (member_id, group_id, nickname)
+    SELECT id, group_id, nickname FROM members WHERE group_id IS NOT NULL
+    ON CONFLICT (member_id, group_id) DO NOTHING;
 `);
 
 const app = express();
@@ -83,15 +92,44 @@ app.post("/api/join", async (req, res) => {
 
   const g = await pool.query("SELECT id, name FROM groups WHERE code = $1", [code]);
   if (!g.rows.length) return bad(res, 404, "그 코드의 그룹이 없어요");
-  const cnt = await pool.query("SELECT count(*)::int AS n FROM members WHERE group_id = $1", [g.rows[0].id]);
-  const existing = await pool.query("SELECT 1 FROM members WHERE id = $1 AND group_id = $2", [memberId, g.rows[0].id]);
+  const gid = g.rows[0].id;
+  const cnt = await pool.query("SELECT count(*)::int AS n FROM memberships WHERE group_id = $1", [gid]);
+  const existing = await pool.query("SELECT 1 FROM memberships WHERE member_id = $1 AND group_id = $2", [memberId, gid]);
   if (!existing.rows.length && cnt.rows[0].n >= MAX_GROUP_MEMBERS)
     return bad(res, 409, `그룹 정원(${MAX_GROUP_MEMBERS}명)이 찼어요`);
+  // 멤버 행 보장(FK 타깃) — 최신 닉네임 반영. 기존 다른 그룹 참여는 유지(덮어쓰지 않음).
   await pool.query(
-    `INSERT INTO members (id, nickname, group_id) VALUES ($1, $2, $3)
-     ON CONFLICT (id) DO UPDATE SET nickname = EXCLUDED.nickname, group_id = EXCLUDED.group_id`,
-    [memberId, nickname, g.rows[0].id]);
+    `INSERT INTO members (id, nickname) VALUES ($1, $2)
+     ON CONFLICT (id) DO UPDATE SET nickname = EXCLUDED.nickname`,
+    [memberId, nickname]);
+  await pool.query(
+    `INSERT INTO memberships (member_id, group_id, nickname) VALUES ($1, $2, $3)
+     ON CONFLICT (member_id, group_id) DO UPDATE SET nickname = EXCLUDED.nickname`,
+    [memberId, gid, nickname]);
   return res.json({ name: g.rows[0].name });
+});
+
+// 내가 속한 그룹 목록 (다중 그룹) — 참여 순.
+app.get("/api/my-groups", async (req, res) => {
+  const memberId = (req.query.memberId || "").trim();
+  if (!isUuid(memberId)) return bad(res, 400, "잘못된 기기 ID");
+  const { rows } = await pool.query(
+    `SELECT g.code, g.name, ms.nickname
+     FROM memberships ms JOIN groups g ON g.id = ms.group_id
+     WHERE ms.member_id = $1 ORDER BY ms.created_at ASC`, [memberId]);
+  return res.json({ groups: rows });
+});
+
+// 그룹 나가기 — 해당 그룹 멤버십만 제거(다른 그룹은 유지).
+app.post("/api/leave", async (req, res) => {
+  const memberId = (req.body?.memberId || "").trim();
+  const code = (req.body?.code || "").trim().toUpperCase();
+  if (!isUuid(memberId)) return bad(res, 400, "잘못된 기기 ID");
+  if (!/^[A-Z2-9]{6}$/.test(code)) return bad(res, 400, "코드는 6자리예요");
+  const g = await pool.query("SELECT id FROM groups WHERE code = $1", [code]);
+  if (!g.rows.length) return bad(res, 404, "그 코드의 그룹이 없어요");
+  await pool.query("DELETE FROM memberships WHERE member_id = $1 AND group_id = $2", [memberId, g.rows[0].id]);
+  return res.json({ ok: true });
 });
 
 app.post("/api/stats", async (req, res) => {
@@ -138,8 +176,9 @@ app.post("/api/nudge", async (req, res) => {
   if (!isUuid(fromId) || !isUuid(toId)) return bad(res, 400, "잘못된 기기 ID");
   if (fromId === toId) return bad(res, 400, "자기 자신은 못 찔러요");
   const pair = await pool.query(
-    `SELECT f.nickname AS from_nick FROM members f, members t
-     WHERE f.id = $1 AND t.id = $2 AND f.group_id = t.group_id AND f.group_id IS NOT NULL`,
+    `SELECT f.nickname AS from_nick FROM memberships f
+     JOIN memberships t ON f.group_id = t.group_id
+     WHERE f.member_id = $1 AND t.member_id = $2 LIMIT 1`,
     [fromId, toId]);
   if (!pair.rows.length) return bad(res, 404, "같은 그룹의 친구에게만 보낼 수 있어요");
   const recent = await pool.query(
@@ -176,15 +215,16 @@ app.get("/api/leaderboard", async (req, res) => {
   const gid = g.rows[0].id;
 
   const { rows } = await pool.query(
-    `SELECT m.id AS member_id, m.nickname,
+    `SELECT m.id AS member_id, ms.nickname,
             COALESCE(w.good_sec, 0) AS good_sec, COALESCE(w.points, 0) AS points,
             COALESCE(w.streak, 0) AS streak,
             p.state, COALESCE(p.skin, 'fairy') AS skin,
             EXTRACT(EPOCH FROM (now() - p.updated_at))::int AS ago_sec
-     FROM members m
+     FROM memberships ms
+     JOIN members m ON m.id = ms.member_id
      LEFT JOIN weekly_stats w ON w.member_id = m.id AND w.week = $2
      LEFT JOIN presence p ON p.member_id = m.id
-     WHERE m.group_id = $1 ORDER BY good_sec DESC, points DESC, m.created_at ASC LIMIT 100`,
+     WHERE ms.group_id = $1 ORDER BY good_sec DESC, points DESC, ms.created_at ASC LIMIT 100`,
     [gid, week]);
 
   // 이번 주 1위를 명예의 전당에 기록(멱등 upsert). 캐시 미스 때만 → 쓰기 자연 throttle.
@@ -218,7 +258,8 @@ app.post("/api/rtc-token", async (req, res) => {
   if (!LIVEKIT_URL || !LIVEKIT_API_KEY || !LIVEKIT_API_SECRET)
     return res.status(503).json({ error: "LiveKit 미설정 (관리자 키 필요)", configured: false });
   const q = await pool.query(
-    "SELECT m.nickname FROM members m JOIN groups g ON g.id = m.group_id WHERE m.id = $1 AND g.code = $2",
+    `SELECT ms.nickname FROM memberships ms JOIN groups g ON g.id = ms.group_id
+     WHERE ms.member_id = $1 AND g.code = $2`,
     [memberId, code]);
   if (!q.rows.length) return bad(res, 404, "그룹 멤버만 가능해요");
   const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET,

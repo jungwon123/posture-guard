@@ -106,6 +106,29 @@
   #leaderboard td, #leaderboard th { padding: 5px 6px; border-bottom: 1px solid var(--line); text-align: left; }
   #leaderboard td:last-child, #leaderboard th:last-child { text-align: right; }
   #leaderboard tr.me td { color: var(--accent); font-weight: 700; }
+  /* 다중 그룹 스위처 칩 */
+  .group-switcher:empty { display: none; }
+  .group-switcher { margin: 6px 0 2px; }
+  .gs-label { font-size: 11px; color: var(--dim); margin-bottom: 5px; }
+  .gs-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .gs-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--bg); border: 1px solid var(--line); color: var(--text);
+    border-radius: 999px; padding: 5px 6px 5px 11px; font-size: 13px; cursor: pointer;
+    transition: border-color .15s, background .15s;
+  }
+  .gs-chip:hover { border-color: var(--accent); }
+  .gs-chip.active {
+    border-color: var(--accent); font-weight: 700;
+    background: color-mix(in srgb, var(--accent) 16%, var(--bg));
+  }
+  .gs-name { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gs-x {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 17px; height: 17px; border-radius: 999px; font-size: 10px;
+    color: var(--dim); background: color-mix(in srgb, var(--line) 60%, transparent);
+  }
+  .gs-x:hover { color: #fff; background: var(--bad); }
   .shop-item {
     display: flex; align-items: center; gap: 10px; padding: 8px 0;
     border-bottom: 1px solid var(--line); font-size: 14px;
