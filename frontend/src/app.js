@@ -1200,27 +1200,34 @@ $("btn-group-join").onclick = async () => {
     els.msg.textContent = `"${name}" 그룹 참여 완료!`;
     await uploadStats();
     refreshLeaderboard();
+    reconcileGroups();                       // 멤버 수 등 서버 목록으로 갱신
   } catch (e) { els.msg.textContent = "참여 실패: " + e.message; }
 };
-// ── 그룹 스위처(칩) 렌더 + 전환/나가기 ──
+// ── 방(그룹) 목록 렌더 + 전환/나가기 ── 카드 탭=전환, [나가기]=탈퇴
 function renderGroupSwitcher() {
   const el = $("group-switcher");
   if (!el) return;
   const list = myGroups(), active = myGroup();
   if (!list.length) { el.innerHTML = ""; return; }
-  el.innerHTML = `<div class="gs-label">내 그룹 ${list.length}개 · 탭해서 전환</div>` +
-    `<div class="gs-chips">` + list.map((g) => {
+  el.innerHTML = `<div class="gl-label">🏠 내 그룹 ${list.length}개 · 탭하면 이동</div>` +
+    `<div class="gl-list">` + list.map((g) => {
       const on = active && active.code === g.code;
-      return `<span class="gs-chip${on ? " active" : ""}" data-code="${g.code}">` +
-        `<span class="gs-name">${esc(g.name)}</span>` +
-        `<span class="gs-x" data-leave="${g.code}" title="나가기">✕</span></span>`;
+      const cnt = g.members ? `<span class="gl-cnt">· 👥 ${g.members}명</span>` : "";
+      return `<div class="gl-room${on ? " active" : ""}" data-code="${g.code}">
+        <div class="gl-avatar">${on ? "🟢" : "🏠"}</div>
+        <div class="gl-body">
+          <div class="gl-top"><span class="gl-name">${esc(g.name)}</span>${on ? `<span class="gl-badge">보는 중</span>` : ""}</div>
+          <div class="gl-meta">코드 ${g.code} · 나: ${esc(g.nickname)} ${cnt}</div>
+        </div>
+        <button class="gl-leave" data-leave="${g.code}" title="이 그룹에서 나가기">나가기</button>
+      </div>`;
     }).join("") + `</div>`;
 }
 $("group-switcher")?.addEventListener("click", async (e) => {
-  const x = e.target.closest(".gs-x");
-  if (x) { // 나가기
+  const lv = e.target.closest(".gl-leave");
+  if (lv) { // 나가기
     e.stopPropagation();
-    const code = x.dataset.leave, g = myGroups().find((v) => v.code === code);
+    const code = lv.dataset.leave, g = myGroups().find((v) => v.code === code);
     if (!confirm(`'${g ? g.name : code}' 그룹에서 나갈까요?`)) return;
     try { await api("leave", { memberId, code }); } catch {}
     removeGroup(code);
@@ -1229,9 +1236,9 @@ $("group-switcher")?.addEventListener("click", async (e) => {
     refreshLeaderboard();
     return;
   }
-  const chip = e.target.closest(".gs-chip");
-  if (!chip || myGroup()?.code === chip.dataset.code) return; // 이미 활성이면 무시
-  setActiveGroup(chip.dataset.code);
+  const room = e.target.closest(".gl-room");
+  if (!room || myGroup()?.code === room.dataset.code) return; // 이미 보는 중이면 무시
+  setActiveGroup(room.dataset.code);
   renderGroupSwitcher();
   await uploadStats();
   refreshLeaderboard();

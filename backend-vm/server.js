@@ -114,7 +114,8 @@ app.get("/api/my-groups", async (req, res) => {
   const memberId = (req.query.memberId || "").trim();
   if (!isUuid(memberId)) return bad(res, 400, "잘못된 기기 ID");
   const { rows } = await pool.query(
-    `SELECT g.code, g.name, ms.nickname
+    `SELECT g.code, g.name, ms.nickname,
+            (SELECT count(*)::int FROM memberships m2 WHERE m2.group_id = g.id) AS members
      FROM memberships ms JOIN groups g ON g.id = ms.group_id
      WHERE ms.member_id = $1 ORDER BY ms.created_at ASC`, [memberId]);
   return res.json({ groups: rows });

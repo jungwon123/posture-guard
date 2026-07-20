@@ -106,29 +106,37 @@
   #leaderboard td, #leaderboard th { padding: 5px 6px; border-bottom: 1px solid var(--line); text-align: left; }
   #leaderboard td:last-child, #leaderboard th:last-child { text-align: right; }
   #leaderboard tr.me td { color: var(--accent); font-weight: 700; }
-  /* 다중 그룹 스위처 칩 */
+  /* 다중 그룹 = 방 목록 카드 */
   .group-switcher:empty { display: none; }
-  .group-switcher { margin: 6px 0 2px; }
-  .gs-label { font-size: 11px; color: var(--dim); margin-bottom: 5px; }
-  .gs-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-  .gs-chip {
-    display: inline-flex; align-items: center; gap: 6px;
-    background: var(--bg); border: 1px solid var(--line); color: var(--text);
-    border-radius: 999px; padding: 5px 6px 5px 11px; font-size: 13px; cursor: pointer;
-    transition: border-color .15s, background .15s;
+  .group-switcher { margin: 8px 0 4px; }
+  .gl-label { font-size: 12px; font-weight: 700; color: var(--dim); margin-bottom: 7px; }
+  .gl-list { display: flex; flex-direction: column; gap: 8px; }
+  .gl-room {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--bg); border: 1px solid var(--line); border-radius: 12px;
+    padding: 10px 12px; cursor: pointer; transition: border-color .15s, background .15s;
   }
-  .gs-chip:hover { border-color: var(--accent); }
-  .gs-chip.active {
-    border-color: var(--accent); font-weight: 700;
-    background: color-mix(in srgb, var(--accent) 16%, var(--bg));
+  .gl-room:hover { border-color: var(--accent); }
+  .gl-room.active {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, var(--bg));
   }
-  .gs-name { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .gs-x {
-    display: inline-flex; align-items: center; justify-content: center;
-    width: 17px; height: 17px; border-radius: 999px; font-size: 10px;
-    color: var(--dim); background: color-mix(in srgb, var(--line) 60%, transparent);
+  .gl-avatar { font-size: 20px; width: 26px; text-align: center; flex-shrink: 0; }
+  .gl-body { flex: 1; min-width: 0; }
+  .gl-top { display: flex; align-items: center; gap: 6px; }
+  .gl-name { font-weight: 700; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gl-badge {
+    flex-shrink: 0; font-size: 10px; font-weight: 800; color: #101418;
+    background: var(--accent); padding: 1px 7px; border-radius: 999px;
   }
-  .gs-x:hover { color: #fff; background: var(--bad); }
+  .gl-meta { font-size: 12px; color: var(--dim); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gl-cnt { white-space: nowrap; }
+  .gl-leave {
+    flex-shrink: 0; font-size: 12px; color: var(--dim);
+    background: transparent; border: 1px solid var(--line); border-radius: 999px;
+    padding: 4px 11px; cursor: pointer; transition: all .15s;
+  }
+  .gl-leave:hover { color: #fff; background: var(--bad); border-color: var(--bad); }
   .shop-item {
     display: flex; align-items: center; gap: 10px; padding: 8px 0;
     border-bottom: 1px solid var(--line); font-size: 14px;
