@@ -16,11 +16,13 @@ const IDX = { NOSE: 0, EAR_L: 7, EAR_R: 8, SH_L: 11, SH_R: 12, WRIST_L: 15, WRIS
 const MIN_VIS = 0.5;
 
 // 절대 페널티 가중치 — core z-score 점수에 exp(-penalty)로 곱해 결합한다(0이면 무영향).
-const ABS_W = { head: 1.6, tilt: 1.4, pitch: 0.5, forward: 1.2, span: 1.4, lateral: 1.0, roll: 0.8, prop: 1.1 }; // pitch↓(1.0→0.5): 필기 시 고개숙임 오탐 완화
-const HEAD_DROP_DEADZONE = 0.15; // 기준 대비 15% 이상 내려가야 페널티 시작
+// 공부 특화 재조정: headVertical·pitch 는 '책·화면을 내려보는' 정상 공부 동작에도 같이 반응(오염)하므로
+// 힘을 뺀다. 거북목 판정은 내려보기에 덜 오염된 forward(전방이동)·span(어깨말림)·tilt(어깨기울기)가 담당.
+const ABS_W = { head: 0.7, tilt: 1.4, pitch: 0.25, forward: 1.2, span: 1.4, lateral: 1.0, roll: 0.8, prop: 1.1 }; // head 1.6→0.7·pitch 0.5→0.25: 내려보기 오탐 완화
+const HEAD_DROP_DEADZONE = 0.25; // 기준 대비 25% 이상 내려가야 페널티(공부 중 책 보는 정도는 허용 — 0.15→0.25)
 const TILT_MARGIN_DEG = 3;       // 기준 + 3도 초과부터 페널티(더 타이트)
 const TILT_FULL_DEG = 14;        // 14도 초과분에서 가중치 최대
-const PITCH_MARGIN_DEG = 28;     // 기준서 28도 이상 숙여야 페널티(필기하며 노트 보는 정도는 허용 — 15→28)
+const PITCH_MARGIN_DEG = 35;     // 기준서 35도 이상 숙여야 페널티(화면·책 오가는 공부 허용 — 28→35)
 const PITCH_FULL_DEG = 48;       // 48도 초과분에서 가중치 최대(완만한 램프)
 const FORWARD_MARGIN = 0.10;     // 기준 대비 정규화 0.10 이상 '앞으로' 나와야 페널티(Z 노이즈 여유)
 const FORWARD_FULL = 0.30;       // +0.30 초과분에서 가중치 최대

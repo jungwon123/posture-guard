@@ -21,9 +21,9 @@ export default function MainPanels() {
 
         {/* 바른자세 기준 등록 중 — 자세 안내 + 큰 카운트다운 */}
         <div id="calib-guide">
-          <div className="calib-instr">허리를 펴고 정면을 바라봐 주세요</div>
+          <div className="calib-instr">평소 공부하는 자세로 앉아 주세요</div>
           <div className="calib-count" id="calib-count">5</div>
-          <div className="calib-sub">이 자세가 '바른 자세' 기준이 돼요</div>
+          <div className="calib-sub">등·목만 곧게 — 이게 '내 공부 바른자세' 기준이 돼요</div>
         </div>
 
         {/* 자리 비움 — 측정이 멈췄음을 분명히 안내 */}

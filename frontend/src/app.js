@@ -321,13 +321,13 @@ async function start() {
   els.btnPip.disabled = false;
   updateOverlays(sm.state); // 시작 CTA 숨기고, 미등록이면 [기준 등록] 강조
   if (rewards.attend(dateStr())) {
-    els.msg.textContent = "출석 +10P! " + (judge ? "감지 중 (저장된 기준 사용)." : "바르게 앉은 뒤 [기준 등록]을 누르세요.");
+    els.msg.textContent = "출석 +10P! " + (judge ? "감지 중 (저장된 기준 사용)." : "평소 공부 자세로 앉은 뒤 [기준 등록]을 누르세요.");
     flashPoints();
     rewardUntil = nowSec() + 3;
   } else {
     els.msg.textContent = judge
       ? "감지 중 (저장된 기준 사용). 기준을 다시 잡으려면 [기준 등록]."
-      : "바르게 앉은 뒤 [기준 등록]을 누르세요.";
+      : "평소 공부 자세로 앉은 뒤 [기준 등록]을 누르세요.";
   }
   if (judge) logTransition(null, sm.state, nowSec());
   ensureFaceModel(); // 머리자세 판정(+눈 깜빡임)용 얼굴 모델 프리로드 — 캘리브 전에 준비되도록
@@ -554,7 +554,7 @@ function tick() {
       if (camSample) camCalibSamples.push(camSample);
       const remain = calibUntil - now;
       els.calibCount.textContent = String(Math.max(0, Math.ceil(remain))); // 큰 카운트다운(오버레이)
-      els.msg.textContent = `바른자세 기준 등록 중… ${Math.max(0, remain).toFixed(1)}s — 허리를 펴고 정면을 바라봐 주세요`;
+      els.msg.textContent = `공부 바른자세 기준 등록 중… ${Math.max(0, remain).toFixed(1)}s — 평소 공부하는 자세로 등·목만 곧게`;
       if (remain <= 0) {
         const wasRegistered = !!judge; // 재등록 여부 — 완료 문구 구분
         if (calibSamples.length >= 5) {
@@ -581,7 +581,7 @@ function tick() {
           els.msg.textContent = "기준 등록 완료. 척추요정이 깨어났어요!";
           centerPop(wasRegistered
             ? `<div class="cp-title">새 기준으로 다시 시작해요</div><div class="cp-sub">이전 경고는 초기화했어요 · 기록 시간은 그대로 이어져요</div>`
-            : `<div class="cp-title">기준 자세 등록 완료!</div><div class="cp-sub">이제 척추요정이 자세를 지켜봐요 👀</div>`, 2800);
+            : `<div class="cp-title">공부 바른자세 등록 완료!</div><div class="cp-sub">이제 척추요정이 지켜봐요 👀<br>화면↔책으로 자세가 바뀌면 [기준 다시 잡기]</div>`, 3000);
           speak(wasRegistered ? "새 기준으로 시작! 💚" : "준비 완료! 지켜볼게요 👀");
         } else {
           els.msg.textContent = "몸이 잘 안 잡혔어요. 다시 [기준 등록]을 눌러주세요.";
@@ -1380,7 +1380,7 @@ els.btnCalib.onclick = () => {
   calibSamples = []; absCalibSamples = []; guideCalibSamples = []; camCalibSamples = []; absSmoother = new AbsSmoother();
   els.calibCount.textContent = String(TUNING.CALIB_SECS);
   updateOverlays(sm.state); // 등록 안내 오버레이 즉시 표시
-  speak("허리를 펴고 정면을 봐요 🧘");
+  speak("평소 공부 자세로, 등·목만 곧게 🧘");
 };
 els.btnNotify.onclick = async () => {
   playNotes(MELODIES.sparkle.notes, rewards.settings.volume); // 사용자 제스처로 오디오 잠금 해제 (아이폰 필수 — 가장 먼저)

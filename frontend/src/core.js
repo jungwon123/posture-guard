@@ -7,10 +7,10 @@ export const TUNING = {
   CALIB_SECS: 5.0,
   SIGMA_FLOOR_FRAC: 0.04,
   DEADZONE_Z: 1.2,   // 살짝 상향(1.0→1.2) — 잔떨림/약한 편차에 덜 예민하게.
-  // v2 재정의: head_drop 폐기(headVertical 대체). 그리고 pitch(고개 숙임) 가중치 대폭↓ —
-  // 인강 필기 등 '고개를 숙여 보는' 정상 동작을 나쁜 자세로 오탐하지 않도록. 진짜 나쁜 자세(거북목·구부정)는
-  // 절대 게이트(headForward/어깨)가 잡는다. 합=1.
-  WEIGHTS: { proximity: 0.5, pitch: 0.18, shoulder_roll: 0.32 },
+  // v2 재정의: head_drop 폐기(headVertical 대체). 공부 특화: pitch(고개 숙임) 가중치를 더 낮춰(0.18→0.10)
+  // 인강 필기·책보기 등 '내려보는' 정상 동작 오탐을 최소화하고, 그 무게를 내려보기에 덜 오염된
+  // shoulder_roll(어깨 말림/등 굽음)로 이전. 진짜 거북목은 절대 게이트(headForward/어깨)가 잡는다. 합=1.
+  WEIGHTS: { proximity: 0.5, pitch: 0.10, shoulder_roll: 0.40 },
   SCORE_K: 1.0,
   BAD_ENTER_SCORE: 60,
   BAD_ENTER_SUSTAIN: 7.0,   // 5→7초: 잠깐 숙였다 드는 정도로는 잔소리 안 하게(지속적일 때만).
