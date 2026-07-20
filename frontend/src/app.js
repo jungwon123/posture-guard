@@ -585,29 +585,6 @@ const KEYPT = { [LM.NOSE]: "#e6763c", [LM.EAR_L]: "#e6aa3c", [LM.EAR_R]: "#e6aa3
 // 신호 이름 → 쉬운 한국어 (트래킹 막대 라벨)
 const SIGNAL_KR = { proximity: "화면 거리", pitch: "고개 숙임", head_drop: "머리 높이", shoulder_roll: "어깨 말림" };
 
-// 캘리브 5초 동안 트래킹에 뜨는 '여기에 상반신을 맞춰요' 실루엣 가이드 (머리 + 어깨/상체)
-function drawCalibGuide(ctx, w, h) {
-  const cx = w / 2;
-  ctx.save();
-  ctx.setLineDash([11, 8]); ctx.lineWidth = 3.5; ctx.lineJoin = "round"; ctx.lineCap = "round";
-  ctx.strokeStyle = "rgba(96,209,200,0.9)";                 // 청록 점선
-  ctx.shadowColor = "rgba(96,209,200,0.55)"; ctx.shadowBlur = 8;
-  const hy = h * 0.30, hr = h * 0.13;                       // 머리 중심·반지름
-  ctx.beginPath(); ctx.arc(cx, hy, hr, 0, 7); ctx.stroke(); // 머리
-  const top = hy + hr;                                      // 어깨 시작(목 아래)
-  ctx.beginPath();                                          // 어깨~상체 실루엣
-  ctx.moveTo(cx - w * 0.26, h);
-  ctx.bezierCurveTo(cx - w * 0.25, h * 0.60, cx - w * 0.17, top, cx, top);
-  ctx.bezierCurveTo(cx + w * 0.17, top, cx + w * 0.25, h * 0.60, cx + w * 0.26, h);
-  ctx.stroke();
-  ctx.restore();
-  const remain = Math.max(0, Math.ceil(calibUntil - nowSec()));
-  ctx.textAlign = "center";
-  ctx.fillStyle = "rgba(96,209,200,0.95)"; ctx.font = "bold 16px sans-serif";
-  ctx.fillText(`이 안에 상반신을 맞춰 바르게 앉아요 · ${remain}초`, cx, 26);
-  ctx.textAlign = "left";
-}
-
 function drawTracking(state, zs) {
   const ctx = els.track.getContext("2d");
   const { width: w, height: h } = els.track;
@@ -618,7 +595,6 @@ function drawTracking(state, zs) {
   for (let gy = 40; gy < h; gy += 40) { ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(w, gy); ctx.stroke(); }
 
   const calibrating = calibUntil !== null;
-  if (calibrating) drawCalibGuide(ctx, w, h); // 5초 캘리브: '여기에 상반신을 맞춰요' 실루엣
 
   const lms = lastResult?.landmarks?.[0];
   if (!lms) {
