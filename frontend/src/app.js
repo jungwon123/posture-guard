@@ -674,18 +674,17 @@ function drawTracking(state, zs) {
     }
   }
 
-  // ── 각도·정렬 수치 (우상단) ──
+  // ── 각도·정렬 수치 (좌상단) ──
   const readout = [];
   if (lastAbs?.shoulderTilt != null) readout.push(["어깨 수평도", `${lastAbs.shoulderTilt.toFixed(0)}°`, lastAbs.shoulderTilt > 12]);
   if (lastAbs?.headPitch != null) readout.push(["머리 각도", `${lastAbs.headPitch >= 0 ? "+" : ""}${lastAbs.headPitch.toFixed(0)}°`, false]);
   if (guideRef && aligned != null) readout.push(["머리 정렬", aligned ? "좋음 ✓" : "숙임/거북목", !aligned]);
-  ctx.font = "13px sans-serif"; ctx.textAlign = "right";
+  ctx.font = "13px sans-serif"; ctx.textAlign = "left";
   readout.forEach(([label, val, warn], i) => {
-    const y = 24 + i * 21;
-    ctx.fillStyle = "#8b98a5"; ctx.fillText(label, w - 78, y);
-    ctx.fillStyle = warn ? "#e6aa3c" : "#e7ecf1"; ctx.fillText(val, w - 12, y);
+    const y = 22 + i * 21;
+    ctx.fillStyle = "#8b98a5"; ctx.fillText(label, 12, y);
+    ctx.fillStyle = warn ? "#e6aa3c" : "#e7ecf1"; ctx.fillText(val, 108, y);
   });
-  ctx.textAlign = "left";
 
   // ── z-score 신호 막대 (하단) ──
   if (zs && Object.keys(zs).length) {

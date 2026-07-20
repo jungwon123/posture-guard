@@ -13,7 +13,6 @@ export default function MainPanels() {
         </div>
       </div>
       <div className="panel">
-        <span className="label">TRACKING</span>
         <canvas id="track" className="fill" width="640" height="480"></canvas>
       </div>
     </main>
