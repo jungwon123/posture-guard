@@ -101,13 +101,31 @@ let lastDetect = 0;
 let lastResult = null;
 let events = store.loadEvents();
 
-// ── 눈 깜빡임 (베타) — 주기 샘플링. 얼굴 모델은 켤 때만 로드, 샘플 창에서만 추론 (배터리 절약) ──
+// ── 눈 깜빡임 — 주기 샘플링. 얼굴 모델은 머리자세 판정용으로 이미 로드돼 있어 추가 비용 0, 샘플 창에서만 카운트 ──
 const BLINK_WINDOW_SEC = 30;    // 한 번 잴 때 30초 측정
 const BLINK_INTERVAL_SEC = 180; // 3분마다 측정
 const BLINK_FIRST_DELAY = 15;   // 켠 뒤 15초 후 첫 측정
 const BLINK_CLOSE = 0.5;        // 눈 감김 점수 이 이상이면 감긴 것
 const BLINK_LOW_RATE = 8;       // 분당 이 미만이면 눈 건조 알림
-let blinkEnabled = localStorage.getItem("pg_blink") === "1";
+const BLINK_NORMAL_LO = 15, BLINK_NORMAL_HI = 20; // 정상 범위(리포트·차트 표기용)
+let blinkEnabled = localStorage.getItem("pg_blink") !== "0"; // 정식 기능 — 기본 켜짐(명시적으로 끈 경우만 off)
+// 측정값 로그 적재 — pg_blink_log = [{t(초), rate}]. 리포트·차트에서 '오늘 평균' 계산에 사용.
+function logBlink(rate) {
+  try {
+    const arr = JSON.parse(localStorage.getItem("pg_blink_log") || "[]");
+    arr.push({ t: Math.floor(Date.now() / 1000), rate });
+    const cutoff = Date.now() / 1000 - 14 * 86400;            // 14일 이전 정리 + 최대 400개
+    localStorage.setItem("pg_blink_log", JSON.stringify(arr.filter((x) => x.t >= cutoff).slice(-400)));
+  } catch {}
+}
+// 오늘 측정 요약 — {n(측정횟수), avg(분당 평균), last}
+function blinkTodayStats() {
+  let arr = [];
+  try { arr = JSON.parse(localStorage.getItem("pg_blink_log") || "[]"); } catch {}
+  const today = arr.filter((x) => x.t >= dayStartSec());
+  if (!today.length) return { n: 0, avg: null, last: null };
+  return { n: today.length, avg: Math.round(today.reduce((a, b) => a + b.rate, 0) / today.length), last: today[today.length - 1].rate };
+}
 let faceLandmarker = null;
 let faceLoading = false;
 let blinkSampling = false, blinkWinStart = 0, blinkCount = 0, blinkClosed = false, blinkFaceFrames = 0;
@@ -350,6 +368,7 @@ function runFace(now, wallMs) {
 // detectForVideo 는 runFace 가 이미 호출했고, 여기선 그 결과(lastFaceFr)의 blendshapes 만 소비.
 function processBlink(now) {
   if (!blinkEnabled || !faceLandmarker || calibUntil !== null) return;
+  if (document.hidden) { blinkSampling = false; return; } // 탭 백그라운드=저FPS라 깜빡임을 놓쳐 오측정 → 측정 창 취소(가짜 낮은 값·건조 알림 방지)
 
   if (!blinkSampling) {
     if (now < nextBlinkAt) {
@@ -382,8 +401,9 @@ function processBlink(now) {
       return;
     }
     blinkRate = Math.round(blinkCount / (BLINK_WINDOW_SEC / 60));
+    logBlink(blinkRate); // 리포트·차트용 오늘 로그 적재
     els.blink.textContent = `👁 ${blinkRate}회/분`;
-    els.blinkStatus.textContent = `방금 측정: 분당 ${blinkRate}회 (정상 15~20)`;
+    els.blinkStatus.textContent = `방금 측정: 분당 ${blinkRate}회 (정상 ${BLINK_NORMAL_LO}~${BLINK_NORMAL_HI})`;
     if (blinkRate < BLINK_LOW_RATE) {
       notify(`👁 눈이 건조해질 수 있어요 — 잠깐 눈을 깜빡이거나 먼 곳을 봐요 (분당 ${blinkRate}회)`);
     }
@@ -820,13 +840,17 @@ function fmtMin(sec) { return (sec / 60).toFixed(1) + "분"; }
 function openReport() {
   const rep = computeReport(events, dayStartSec(), nowSec());
   const todayEarned = rewards.today.date === dateStr() ? rewards.today.earned : 0;
-  els.reportTable.innerHTML = [
+  const bt = blinkTodayStats();
+  const rows = [
     ["총 감시 시간", fmtMin(rep.watched)],
     ["바른 자세", `${fmtMin(rep.good)}${rep.ratio !== null ? ` (${Math.round(rep.ratio * 100)}%)` : ""}`],
     ["나쁜 자세", `${fmtMin(rep.bad)} · ${rep.badCount}회`],
     ["최장 연속 바른 자세", fmtMin(rep.longestGood)],
-    ["오늘 얻은 포인트", `+${todayEarned}P`],
-  ].map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join("");
+  ];
+  if (blinkEnabled || bt.n) // 눈 깜빡임: 오늘 평균(분당). 정상 15~20
+    rows.push(["👁 오늘 평균 깜빡임", bt.n ? `분당 ${bt.avg}회 (정상 ${BLINK_NORMAL_LO}~${BLINK_NORMAL_HI})` : "아직 측정 전"]);
+  rows.push(["오늘 얻은 포인트", `+${todayEarned}P`]);
+  els.reportTable.innerHTML = rows.map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join("");
   els.reportGrade.textContent = rep.grade;
   // 등급별 캐릭터: 90%+ 칭찬 / 70%+ 평온 / 그 미만 거북목 아픔 (방치의 결과)
   const gradeAnim = rep.ratio === null ? "idle" :

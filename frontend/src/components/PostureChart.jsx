@@ -4,7 +4,7 @@
 import { useEffect, useState } from "react";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
-  BarChart, Bar, Cell, PieChart, Pie,
+  BarChart, Bar, Cell, PieChart, Pie, ReferenceArea,
 } from "recharts";
 
 const nowSec = () => Date.now() / 1000;
@@ -116,7 +116,16 @@ function readData() {
   const log = events.filter((ev) => ev.t >= t0 && ev.from && L[ev.to]).slice(-15).reverse()
     .map((ev) => ({ time: new Date(ev.t * 1000).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }), text: L[ev.to] }));
 
-  return { series, daily, dailyHasData, breakdown, breakdownTotal, today, thisWeek, lastWeek, log };
+  // ④ 오늘 눈 깜빡임(분당) — pg_blink_log = [{t, rate}]
+  let blinkLog = [];
+  try { blinkLog = JSON.parse(localStorage.getItem("pg_blink_log") || "[]"); } catch {}
+  const blink = blinkLog.filter((x) => x.t >= t0).map((x) => ({
+    label: new Date(x.t * 1000).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }),
+    rate: x.rate,
+  }));
+  const blinkAvg = blink.length ? Math.round(blink.reduce((a, b) => a + b.rate, 0) / blink.length) : null;
+
+  return { series, daily, dailyHasData, breakdown, breakdownTotal, today, thisWeek, lastWeek, log, blink, blinkAvg };
 }
 
 function Delta({ now, prev, unit, pct }) {
@@ -143,6 +152,11 @@ function PieTip({ active, payload }) {
   const pct = p._total > 0 ? Math.round((p.value / p._total) * 100) : 0;
   return <div className="chart-tip"><b style={{ color: p.color }}>{p.name}</b> · {fmtMin(p.value)} ({pct}%)</div>;
 }
+function BlinkTip({ active, payload }) {
+  if (!active || !payload?.length) return null;
+  const p = payload[0].payload;
+  return <div className="chart-tip">{p.label} · <b>{p.rate}회/분</b></div>;
+}
 
 export default function PostureChart() {
   const [tab, setTab] = useState("chart");
@@ -154,8 +168,9 @@ export default function PostureChart() {
   useEffect(() => { setD(readData()); }, [tab]);
 
   const hasHourly = d.series.length > 0;
-  const anyData = hasHourly || d.dailyHasData || d.breakdownTotal > 0;
+  const anyData = hasHourly || d.dailyHasData || d.breakdownTotal > 0 || d.blink.length > 0;
   const t = d.today;
+  const blinkMax = Math.max(25, ...d.blink.map((x) => x.rate)); // 정상 20 + 여유
   const pieData = d.breakdown.map((x) => ({ ...x, _total: d.breakdownTotal }));
   // 막대 차트 Y축 도메인 명시 — auto 도메인 + ResponsiveContainer 초기 측정이 겹치면 막대 스케일이 축과 어긋난다.
   const dayMax = Math.max(30, ...d.daily.map((x) => x.min));
@@ -192,7 +207,7 @@ export default function PostureChart() {
                     <Tooltip content={<AccTip />} cursor={{ stroke: "var(--accent)", strokeOpacity: 0.3 }} />
                     <Area type="monotone" dataKey="acc" stroke="var(--accent)" strokeWidth={2.5}
                           fill="url(#accFill)" connectNulls dot={{ r: 2.5, fill: "var(--accent)" }}
-                          activeDot={{ r: 5 }} isAnimationActive />
+                          activeDot={{ r: 5 }} isAnimationActive={false} />
                   </AreaChart>
                 </ResponsiveContainer>
                 <p className="hint">높을수록 바른 자세로 있었던 비율이에요. 오늘 공부한 시간대만 표시됩니다.</p>
@@ -242,6 +257,33 @@ export default function PostureChart() {
                     <span key={x.key}><i style={{ background: x.color }} />{x.name} {fmtMin(x.value)}</span>
                   ))}
                 </div>
+              </section>
+            )}
+
+            {/* ④ 오늘 눈 깜빡임 (분당) */}
+            {d.blink.length > 0 && (
+              <section className="chart-sub">
+                <div className="chart-title">👁 오늘 눈 깜빡임 (분당)</div>
+                <ResponsiveContainer width="100%" height={190}>
+                  <AreaChart data={d.blink} margin={{ top: 8, right: 10, left: -18, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="blinkFill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#5ec8e0" stopOpacity={0.42} />
+                        <stop offset="100%" stopColor="#5ec8e0" stopOpacity={0.02} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid stroke="var(--line)" strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="label" tick={{ fill: "var(--dim)", fontSize: 11 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                    <YAxis domain={[0, blinkMax]} tick={{ fill: "var(--dim)", fontSize: 11 }} axisLine={false} tickLine={false} unit="회" width={44} allowDecimals={false} />
+                    <ReferenceArea y1={15} y2={20} fill="#6fe08a" fillOpacity={0.13} ifOverflow="extendDomain"
+                                   label={{ value: "정상", fill: "var(--dim)", fontSize: 10, position: "insideTopRight" }} />
+                    <Tooltip content={<BlinkTip />} cursor={{ stroke: "#5ec8e0", strokeOpacity: 0.3 }} />
+                    <Area type="monotone" dataKey="rate" stroke="#5ec8e0" strokeWidth={2.5}
+                          fill="url(#blinkFill)" connectNulls dot={{ r: 2.5, fill: "#5ec8e0" }}
+                          activeDot={{ r: 5 }} isAnimationActive={false} />
+                  </AreaChart>
+                </ResponsiveContainer>
+                <p className="hint">분당 15~20회가 정상이에요{d.blinkAvg != null ? ` · 오늘 평균 ${d.blinkAvg}회` : ""}. 낮으면 눈이 건조할 수 있어요 — 잠깐 먼 곳을 봐요.</p>
               </section>
             )}
           </div>
