@@ -137,6 +137,14 @@
     padding: 4px 11px; cursor: pointer; transition: all .15s;
   }
   .gl-leave:hover { color: #fff; background: var(--bad); border-color: var(--bad); }
+  .gl-empty { font-size: 13px; color: var(--dim); line-height: 1.65; padding: 6px 2px 2px; }
+  /* 그룹 만들기·참여 = 접이식(평소 접힘, 그룹 없으면 자동 펼침) */
+  #group-info:empty { display: none; }
+  .group-add { margin: 10px 0 4px; padding: 2px 12px; background: var(--bg); }
+  .group-add > summary { font-weight: 700; font-size: 13px; color: var(--dim); padding: 7px 0; }
+  .group-add[open] > summary { color: var(--text); }
+  .group-add .row { margin: 8px 0; }
+  .group-add .hint { margin: 2px 0 8px; }
   .shop-item {
     display: flex; align-items: center; gap: 10px; padding: 8px 0;
     border-bottom: 1px solid var(--line); font-size: 14px;

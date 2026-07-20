@@ -1059,14 +1059,14 @@ async function uploadStats() {
 async function refreshLeaderboard() {
   const g = myGroup();
   const info = $("group-info"), board = $("leaderboard");
-  if (!g) { info.textContent = "그룹을 만들거나 코드를 받아 참여해보세요."; board.innerHTML = ""; return; }
-  info.textContent = `${g.name} · 코드 ${g.code} · 나: ${g.nickname}`;
+  if (!g) { info.textContent = ""; board.innerHTML = ""; return; } // 방 목록 빈-상태 안내가 대신함
+  info.textContent = ""; // 방 카드에 이미 이름·코드·닉네임 있음 — 중복 제거, 에러일 때만 표시
   try {
     const { rows, champions } = await api(`leaderboard?code=${g.code}&week=${weekKey()}`);
     board.innerHTML = renderHallOfFame(rows, champions);
   } catch (e) {
     board.innerHTML = "";
-    info.textContent += ` — 랭킹 불러오기 실패 (${e.message})`;
+    info.textContent = `랭킹 불러오기 실패 (${e.message})`;
   }
 }
 
@@ -1208,15 +1208,22 @@ function renderGroupSwitcher() {
   const el = $("group-switcher");
   if (!el) return;
   const list = myGroups(), active = myGroup();
-  if (!list.length) { el.innerHTML = ""; return; }
-  el.innerHTML = `<div class="gl-label">🏠 내 그룹 ${list.length}개 · 탭하면 이동</div>` +
+  const add = $("group-add");
+  if (add) add.open = !list.length; // 그룹 없으면 추가 폼 펼침, 있으면 접어 단순화
+  if (!list.length) {
+    el.innerHTML = `<div class="gl-empty">아직 들어간 그룹이 없어요.<br>아래에서 그룹을 만들거나 코드로 참여해요 👇</div>`;
+    return;
+  }
+  const multi = list.length > 1;
+  el.innerHTML = `<div class="gl-label">🏠 내 그룹${multi ? ` ${list.length}개 · 탭해서 이동` : ""}</div>` +
     `<div class="gl-list">` + list.map((g) => {
       const on = active && active.code === g.code;
       const cnt = g.members ? `<span class="gl-cnt">· 👥 ${g.members}명</span>` : "";
+      const badge = (on && multi) ? `<span class="gl-badge">보는 중</span>` : "";
       return `<div class="gl-room${on ? " active" : ""}" data-code="${g.code}">
         <div class="gl-avatar">${on ? "🟢" : "🏠"}</div>
         <div class="gl-body">
-          <div class="gl-top"><span class="gl-name">${esc(g.name)}</span>${on ? `<span class="gl-badge">보는 중</span>` : ""}</div>
+          <div class="gl-top"><span class="gl-name">${esc(g.name)}</span>${badge}</div>
           <div class="gl-meta">코드 ${g.code} · 나: ${esc(g.nickname)} ${cnt}</div>
         </div>
         <button class="gl-leave" data-leave="${g.code}" title="이 그룹에서 나가기">나가기</button>
