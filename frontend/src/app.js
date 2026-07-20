@@ -1296,7 +1296,8 @@ if (new URLSearchParams(location.search).has("fwd")) {
   document.body.appendChild(dbg);
   setInterval(() => {
     const L = window.__pgLive || {};
-    dbg.textContent = `headForward (거북목 Phase1)\n현재 : ${L.fwd ?? "-"}\n기준 : ${L.fwdRef ?? "-"}\nΔ    : ${L.fwdDev ?? "-"}\npitch: ${L.pitch ?? "-"}`;
+    const dev = L.fwdDev, on = dev != null && dev > 0.10;
+    dbg.textContent = `headForward (거북목 판정 ON)\n현재 : ${L.fwd ?? "-"}\n기준 : ${L.fwdRef ?? "-"}\nΔ    : ${dev ?? "-"}  ${on ? "⚠️감점" : "(>0.10 감점)"}\npitch: ${L.pitch ?? "-"}`;
   }, 300);
 }
 els.points.textContent = `🪙 ${rewards.points}P`;

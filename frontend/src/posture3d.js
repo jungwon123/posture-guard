@@ -16,12 +16,14 @@ const IDX = { NOSE: 0, EAR_L: 7, EAR_R: 8, SH_L: 11, SH_R: 12 };
 const MIN_VIS = 0.5;
 
 // 절대 페널티 가중치 — core z-score 점수에 exp(-penalty)로 곱해 결합한다(0이면 무영향).
-const ABS_W = { head: 1.6, tilt: 0.6, pitch: 1.0 };
+const ABS_W = { head: 1.6, tilt: 0.6, pitch: 1.0, forward: 1.2 }; // forward=거북목 전방이동(기기검증 전 보수적)
 const HEAD_DROP_DEADZONE = 0.15; // 기준 대비 15% 이상 내려가야 페널티 시작
 const TILT_MARGIN_DEG = 8;       // 기준 + 8도 초과부터 페널티
 const TILT_FULL_DEG = 30;        // 30도 초과분에서 가중치 최대
 const PITCH_MARGIN_DEG = 15;     // 머리 각도가 기준에서 15도 이상 벗어나야 페널티(양방향, 여유 넉넉)
 const PITCH_FULL_DEG = 35;       // 35도 초과분에서 가중치 최대
+const FORWARD_MARGIN = 0.10;     // 기준 대비 정규화 0.10 이상 '앞으로' 나와야 페널티(Z 노이즈 여유)
+const FORWARD_FULL = 0.30;       // +0.30 초과분에서 가중치 최대
 
 // ── One-Euro 필터 (지터는 줄이고 지연은 최소) ──
 class LowPass {
@@ -144,6 +146,14 @@ function pitchTerm(m, ref) {
   return dp > 0 ? Math.min(dp / PITCH_FULL_DEG, 1.5) : 0;
 }
 
+// 전방머리(거북목) 편차 → 0..1.5. '앞으로' 나온 만큼만(뒤로 젖힘은 무시=비대칭).
+// MediaPipe world z: 작을수록 카메라에 가까움 → 거북목이면 귀 z↓ → headForward↑ → 기준보다 커짐.
+function forwardTerm(m, ref) {
+  if (m.headForward == null || ref.headForward == null) return 0;
+  const f = (m.headForward - ref.headForward) - FORWARD_MARGIN;
+  return f > 0 ? Math.min(f / FORWARD_FULL, 1.5) : 0;
+}
+
 // 좋은 기준 대비 얼마나 나빠졌는지 → 페널티(≥0). core 점수에 exp(-penalty)로 곱한다.
 export function absPenalty(m, ref) {
   if (!m || !ref || !ref.headVertical) return 0;
@@ -152,7 +162,8 @@ export function absPenalty(m, ref) {
   if (drop > HEAD_DROP_DEADZONE) pen += ABS_W.head * (drop - HEAD_DROP_DEADZONE);
   const tilt = m.shoulderTilt - (ref.shoulderTilt + TILT_MARGIN_DEG);
   if (tilt > 0) pen += ABS_W.tilt * Math.min(tilt / TILT_FULL_DEG, 1.5);
-  pen += ABS_W.pitch * pitchTerm(m, ref); // 전방머리/고개숙임(정면 카메라가 약한 축)
+  pen += ABS_W.pitch * pitchTerm(m, ref);      // 고개 숙임(머리 각도 편차)
+  pen += ABS_W.forward * forwardTerm(m, ref);  // 거북목 전방이동(깊이 Z) — 정면 카메라가 약한 핵심 축
   return pen;
 }
 
@@ -162,9 +173,9 @@ export function absWorst(m, ref) {
   if (!m || !ref || !ref.headVertical) return null;
   const drop = (ref.headVertical - m.headVertical) / Math.max(ref.headVertical, 1e-3) - HEAD_DROP_DEADZONE;
   const tilt = (m.shoulderTilt - (ref.shoulderTilt + TILT_MARGIN_DEG)) / TILT_FULL_DEG;
-  const neck = Math.max(drop, pitchTerm(m, ref)); // 목 문제 = 수직드롭 또는 머리각 편차
+  const neck = Math.max(drop, pitchTerm(m, ref), forwardTerm(m, ref)); // 목 문제 = 수직드롭·머리각·전방이동
   if (neck <= 0 && tilt <= 0) return null;
-  return neck >= tilt ? "head_drop" : "shoulder_roll";
+  return neck >= tilt ? "head_drop" : "shoulder_roll"; // "head_drop" 키 = Buddy 거북목 메시지(턱 당기기)
 }
 
 // ── 트래킹 고스트 가이드용 2D 기하 (판정과 무관, 렌더 전용) ──
