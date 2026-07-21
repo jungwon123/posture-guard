@@ -790,7 +790,7 @@
 .hof-legend span { display: inline-flex; align-items: center; gap: 5px; }
 
 .hof-list { display: grid; grid-template-columns: 1fr; gap: 4px; }
-@media (min-width: 620px) { .hof-list { grid-template-columns: 1fr 1fr; column-gap: 10px; } }
+/* 2열 분기 금지: PC도 430px 폰 프레임이라 2열이면 상태 라벨이 카드 밖으로 넘친다 */
 .hof-row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px;
   background: #ffffff08; font-size: 13.5px; }
 .hof-row.me { background: #f5c54222; border: 1px solid #f5c54255; }
