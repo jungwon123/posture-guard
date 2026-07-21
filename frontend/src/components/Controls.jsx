@@ -15,7 +15,7 @@ export default function Controls() {
           <button id="btn-report">오늘 리포트</button>
         </div>
       </details>
-      <div id="msg">공부 시작을 누르면 감지가 시작됩니다. 영상은 저장·전송되지 않습니다.</div>
+      <div id="msg">영상은 저장되지 않습니다.</div>
       <div id="summary"></div>
     </>
   );

@@ -203,7 +203,7 @@
 
   /* ── 함께 공부 진입 CTA (홈 → 함께 탭) ── */
   .together-cta {
-    display: flex; align-items: center; gap: 12px; width: auto; margin: 4px 16px 10px;
+    display: flex; align-items: center; gap: 12px; width: calc(100% - 32px); margin: 4px 16px 10px;
     background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; text-align: left;
   }
   .together-cta:hover { border-color: var(--accent); }
