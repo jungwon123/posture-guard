@@ -21,7 +21,7 @@ function PostureTile({ postures, onNudge, cooldown }) {
   const fresh = info && Date.now() - info.ts < 6000; // 6초 지나면 오래된 정보로 간주
   const state = fresh ? info.state : null;
   const nick = pt?.name || "친구";
-  const badge = state === "BAD" ? "🔴 자세 흐트러짐"
+  const badge = state === "BAD" ? `🔴 ${Math.round(info.score ?? 0)}점`
     : state === "GOOD" ? `🟢 ${Math.round(info.score ?? 0)}점`
     : state === "AWAY" ? "⚪ 자리비움"
     : state === "off" ? "카메라 꺼짐" : "…";
@@ -88,7 +88,6 @@ function RoomInner({ onClose }) {
   const room = useRoomContext();
   const [postures, setPostures] = useState({});   // { identity: {state, score, ts} }
   const [cooldown, setCooldown] = useState({});   // { identity: 재전송가능시각 }
-  const [nudge, setNudge] = useState(null);       // 받은 콕 알림 배너
 
   // 내 자세 상태/점수 주기 브로드캐스트 (점수는 숫자만 — 영상/좌표 아님) + 내 타일에도 반영
   useEffect(() => {
@@ -112,11 +111,8 @@ function RoomInner({ onClose }) {
         setPostures((m) => ({ ...m, [participant.identity]: { ...obj, ts: Date.now() } }));
       } else if (topic === "nudge") {
         const from = obj.from || participant?.name || "친구";
-        setNudge({ from, ts: Date.now() });
-        try { navigator.vibrate?.([140, 70, 140]); } catch {}
-        // 엔진(app.js)에 알려 알림음·요정 반응까지 (리스너가 있으면)
+        // 표시는 엔진(app.js)의 화면 최상단 배너(showNudge)가 담당 — 그리드 밖·스크롤 상태에서도 확실히 보이게
         try { window.dispatchEvent(new CustomEvent("pg-nudge", { detail: { from } })); } catch {}
-        setTimeout(() => setNudge((n) => (n && Date.now() - n.ts >= 4800 ? null : n)), 5000);
       }
     };
     room.on(RoomEvent.DataReceived, onData);
@@ -136,9 +132,6 @@ function RoomInner({ onClose }) {
 
   return (
     <>
-      {nudge && (
-        <div className="nudge-pop">🔔 <b>{nudge.from}</b> 님이 자세 펴라고 콕! 찔렀어요. 허리 쫙! 🌟</div>
-      )}
       <ShareToggle />
       <p className="hint">공유를 켜면 친구들이 내 자세를 실시간으로 봐요. <b>자세 점수(숫자)는 카메라를 안 켜도</b> 서로 보여요. 영상은 LiveKit 서버를 통해 전달돼요.</p>
       <Grid postures={postures} onNudge={sendNudge} cooldown={cooldown} />

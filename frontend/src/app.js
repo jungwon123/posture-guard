@@ -199,6 +199,19 @@ function showToast(body) {
   clearTimeout(showToast._t);
   showToast._t = setTimeout(() => { t.style.opacity = "0"; }, 4000);
 }
+// 콕! 알림 — 그리드 div 안이 아니라 화면 최상단에 크게 띄운다. 모바일은 포그라운드에서 시스템 알림을
+// 억제하므로(탭이 보이는 중엔 안 뜸) 인앱 배너 + 진동 + 소리로 확실히 알린다. from=보낸 사람 닉네임.
+function showNudge(from) {
+  let el = document.getElementById("nudge-banner");
+  if (!el) { el = document.createElement("div"); el.id = "nudge-banner"; el.className = "nudge-banner"; document.body.appendChild(el); }
+  el.innerHTML = `👉 <b>${esc(from || "친구")}</b>님이 콕! 찔렀어요. 허리 펴요!`;
+  el.classList.remove("show"); void el.offsetWidth; el.classList.add("show"); // 리플로우로 슬라이드 애니 재시작
+  clearTimeout(showNudge._t);
+  showNudge._t = setTimeout(() => el.classList.remove("show"), 5000);
+  try { navigator.vibrate?.([160, 80, 160, 80, 220]); } catch {}
+  playAlert(1, `${from || "친구"}님이 콕! 찔렀어요`); // 소리(설정 따름)
+  speak("허리 펴라고 콕! 😤");
+}
 function notify(body) {
   if (typeof Notification === "undefined" || Notification.permission !== "granted") {
     showToast(body);
@@ -1360,10 +1373,7 @@ async function pollNudges() {
   if (!myGroup()) return;
   try {
     const { nudges } = await api(`nudges?memberId=${memberId}`);
-    for (const n of nudges) {
-      const m = `👉 ${n.from_nick}님이 자세 펴라고 콕 찔렀어요!`;
-      notify(m); playAlert(1, m);
-    }
+    for (const n of nudges) showNudge(n.from_nick);
   } catch {}
 }
 setInterval(uploadPresence, 30_000);
@@ -1514,12 +1524,8 @@ applyMode(localStorage.getItem("pg_mode") || "dark");
 if (themeBtn) themeBtn.onclick = () =>
   applyMode(document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light");
 
-// 그룹 그리드에서 친구가 "자세 콕!"을 보내면(LiveKit 데이터) 알림음·진동·요정 반응
-window.addEventListener("pg-nudge", (e) => {
-  const from = e?.detail?.from || "친구";
-  notify(`🔔 ${from}님이 자세 교정하라고 콕! 찔렀어요. 허리 펴요!`);
-  speak("허리 펴라고 콕! 😤");
-});
+// 그룹 그리드에서 친구가 "자세 콕!"을 보내면(LiveKit 데이터) → 최상단 배너 + 진동 + 소리
+window.addEventListener("pg-nudge", (e) => showNudge(e?.detail?.from));
 
 // ── 홈 화면 설치 안내 ──
 // 완전 자동 설치는 어떤 브라우저도 불가(악용 방지). 안드로이드/데스크톱은 네이티브 설치 프롬프트,

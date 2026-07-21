@@ -48,7 +48,19 @@ await pool.query(`
 const app = express();
 app.set("trust proxy", 1); // Caddy 프록시 뒤 — 실제 IP
 app.use(express.json());
-app.use(cors({ origin: ["https://posture-guard-rust.vercel.app", "http://localhost:8137"] }));
+// CORS — 프로덕션 alias 하나만 허용하면 Vercel 배포/프리뷰 URL(매 배포마다 새 도메인)·로컬 dev에서
+// 모든 API가 막혀 그룹 그리드 등이 조용히 죽는다. 이 프로젝트의 Vercel 오리진 전체 + 로컬 dev 허용.
+const CORS_ALLOW = [
+  /^https:\/\/posture-guard-rust\.vercel\.app$/,                              // 프로덕션 alias
+  /^https:\/\/posture-guard-[a-z0-9]+-jungwons-projects-[a-z0-9]+\.vercel\.app$/, // 배포/프리뷰 URL(팀 스코프)
+  /^http:\/\/localhost:\d+$/,                                                // 로컬 개발
+];
+app.use(cors({
+  origin: (origin, cb) => {
+    if (!origin) return cb(null, true); // 서버-서버·curl(Origin 없음) 허용
+    cb(null, CORS_ALLOW.some((re) => re.test(origin)));
+  },
+}));
 app.use("/api/", rateLimit({ windowMs: 60_000, max: 120, standardHeaders: true, legacyHeaders: false }));
 const createLimiter = rateLimit({ windowMs: 3600_000, max: 10, standardHeaders: true, legacyHeaders: false,
   message: { error: "그룹 생성이 너무 잦아요 — 잠시 후 다시 시도해주세요" } });
