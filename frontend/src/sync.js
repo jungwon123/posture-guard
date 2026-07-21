@@ -6,7 +6,7 @@ export const API_BASE = "https://34-64-158-222.sslip.io";
 
 // 구글 소셜 로그인 클라이언트 ID — 빈 문자열이면 미설정(로그인 화면에 구글 버튼이 안 뜸).
 // Google Cloud 콘솔에서 OAuth 클라이언트(웹) 만들고 여기에 채우면 켜진다.
-export const GOOGLE_CLIENT_ID = "";
+export const GOOGLE_CLIENT_ID = "291653947562-29ijtudcujiff6ogsj5icbvn6gmrpabb.apps.googleusercontent.com";
 
 const jparse = (k, fallback) => {
   try { return JSON.parse(localStorage.getItem(k) ?? "null") ?? fallback; } catch { return fallback; }
