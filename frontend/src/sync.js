@@ -196,3 +196,12 @@ export async function resetDailyOnServer(dateKey) {
       days: [{ date: dateKey, watched: 0, good: 0, caution: 0, bad: 0, badCount: 0, longestGood: 0 }] });
   } catch (e) { dropAuthIf401(e); }
 }
+
+// 로그아웃 시 개인 데이터 삭제 — 서버가 원본이므로 기기(특히 공용 기기)에 통계를 남기지 않는다.
+// 기기 설정(알림·테마·요정 위치 등)은 유지.
+export function wipeLocalData() {
+  ["pg_events", "pg_daily", "pg_points", "pg_today", "pg_shop",
+   "pg_attend_days", "pg_attend_last", "pg_last_active", "pg_profile",
+   "pg_blink", "pg_blink_log", "pg_group", "pg_groups", "pg_entered",
+  ].forEach((k) => localStorage.removeItem(k));
+}

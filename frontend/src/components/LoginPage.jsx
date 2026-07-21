@@ -1,11 +1,11 @@
 // 시작 화면(앱 로그인 게이트) — 숲 배경 위 미니멀 글래스 카드.
-// 게스트 진입(시작하기) + 계정 로그인/회원가입(서버 동기화 — 포인트·요정·출석 백업/복원).
+// 계정 필수(게스트 없음): 일반 로그인/회원가입 + 구글. 통계·포인트는 서버가 원본.
 import { useEffect, useRef, useState } from "react";
 import { apiLogin, apiRegister, apiGoogleLogin, setAuth, restoreData, GOOGLE_CLIENT_ID } from "../sync.js";
 
 const GSI_SRC = "https://accounts.google.com/gsi/client";
 
-export default function LoginPage({ onGuest }) {
+export default function LoginPage() {
   const [mode, setMode] = useState("login"); // login | register
   const [nickname, setNickname] = useState("");
   const [password, setPassword] = useState("");
@@ -33,7 +33,6 @@ export default function LoginPage({ onGuest }) {
         setAuth(r.token, r.nickname);
         if (r.memberId) localStorage.setItem("pg_member_id", r.memberId); // 서버 ID 채택(기기 간 통일)
         if (r.data) restoreData(r.data); // 서버 백업을 로컬로 복원(포인트·요정·출석)
-        localStorage.setItem("pg_entered", "1");
         location.reload(); // 엔진·React가 복원된 데이터로 다시 부팅
       } catch (err) {
         // 503 {configured:false} = 서버에 구글 키 미등록
@@ -109,9 +108,8 @@ export default function LoginPage({ onGuest }) {
     <div className="login-card-v2">
       <h2 className="login-title">척추요정</h2>
       <p className="login-tagline">함께 공부하고, 자세는 요정이 지켜줘요</p>
-      <button type="button" className="login-primary" onClick={onGuest}>시작하기</button>
-      <details className="login-more">
-        <summary>{mode === "login" ? "계정으로 로그인 · 어느 기기서든 이어쓰기" : "새 계정 만들기"}</summary>
+      <div className="login-more-open">
+        <p className="login-formhead">{mode === "login" ? "로그인 · 어느 기기서든 이어쓰기" : "새 계정 만들기"}</p>
         <form className="login-form" onSubmit={submit}>
           <input type="text" placeholder="닉네임" maxLength={12} autoComplete="username"
             value={nickname} onChange={(e) => setNickname(e.target.value)} />
@@ -128,7 +126,7 @@ export default function LoginPage({ onGuest }) {
           </button>
           {GOOGLE_CLIENT_ID ? <div className="login-google" ref={googleRef}></div> : null}
         </form>
-      </details>
+      </div>
     </div>
   );
 }

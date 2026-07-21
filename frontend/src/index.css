@@ -934,3 +934,7 @@ details[open] > summary::before { transform: none; }
 .cal-head::after { content: ""; position: absolute; left: 50%; bottom: 0; transform: translateX(-50%);
   width: 55%; height: 10px; opacity: .6;
   background: url("/assets/ui/ui-divider.png") center / contain no-repeat; }
+
+/* 로그인 폼 상시 노출 (게스트 제거) */
+.login-more-open { margin-top: 6px; }
+.login-formhead { font-size: 12.5px; font-weight: 700; color: var(--dim); text-align: center; margin: 0 0 8px; }

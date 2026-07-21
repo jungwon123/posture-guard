@@ -7,7 +7,7 @@ import Controls from "./components/Controls.jsx";
 import AttendanceCard from "./components/AttendanceCard.jsx";
 import PostureChart from "./components/PostureChart.jsx";
 import CalendarCard from "./components/CalendarCard.jsx";
-import { localDateStr, resetDailyOnServer } from "./sync.js";
+import { localDateStr, resetDailyOnServer, getAuth, clearAuth, wipeLocalData } from "./sync.js";
 import SettingsPanel from "./components/SettingsPanel.jsx";
 import EyeCarePanel from "./components/EyeCarePanel.jsx";
 import GroupPanel from "./components/GroupPanel.jsx";
@@ -19,12 +19,15 @@ import InstallBanner from "./components/InstallBanner.jsx";
 import BottomNav from "./components/BottomNav.jsx";
 import Buddy from "./components/Buddy.jsx";
 import { initApp } from "./app.js";
-import { getAuth, clearAuth } from "./sync.js";
 
 // 계정 카드(설정 페이지) — 로그인 상태·동기화 안내 + 로그아웃/로그인 진입
-function AccountCard({ onLogin }) {
+function AccountCard() {
   const auth = getAuth();
-  const logout = () => { clearAuth(); location.reload(); };
+  // 로그아웃 = 계정 해제 + 이 기기의 개인 데이터(통계·포인트·기록) 삭제. 서버 백업이 원본.
+  const logout = () => {
+    if (!confirm("로그아웃할까요?\n이 기기의 공부 기록·포인트는 지워져요. (계정에는 안전하게 저장돼 있어요)")) return;
+    clearAuth(); wipeLocalData(); location.reload();
+  };
   return (
     <div className="card account-card">
       {auth ? (
@@ -38,10 +41,10 @@ function AccountCard({ onLogin }) {
       ) : (
         <>
           <div className="account-info">
-            <b>게스트로 사용 중</b>
-            <span className="account-sub">로그인하면 포인트·요정을 어느 기기서든 이어써요</span>
+            <b>로그인이 풀렸어요</b>
+            <span className="account-sub">다시 로그인하면 기록을 이어써요</span>
           </div>
-          <button type="button" className="primary" onClick={onLogin}>로그인</button>
+          <button type="button" className="primary" onClick={() => location.reload()}>로그인</button>
         </>
       )}
     </div>
@@ -54,9 +57,8 @@ function AccountCard({ onLogin }) {
 export default function App() {
   const [page, setPage] = useState("main");
   const [showStats, setShowStats] = useState(false);            // 통계 시트(차트·기록)
-  const [entered, setEntered] = useState(() => localStorage.getItem("pg_entered") === "1"); // 로그인 게이트
+  const authed = !!getAuth(); // 로그인 게이트 — 계정 필수(게스트 없음)
   useEffect(() => { initApp(); }, []);
-  const enter = () => { localStorage.setItem("pg_entered", "1"); setEntered(true); };
   const show = (id) => ({ display: page === id ? undefined : "none" });
 
   return (
@@ -85,7 +87,7 @@ export default function App() {
       {/* 설정 페이지 — 하단 '설정' 탭. 출석·알림·눈깜빡임 설정을 여기로 모음 */}
       <div className="page" style={show("settings")}>
         <div className="page-title">설정</div>
-        <AccountCard onLogin={() => { localStorage.removeItem("pg_entered"); setEntered(false); }} />
+        <AccountCard />
         <AttendanceCard />
         <SettingsPanel />
         <EyeCarePanel />
@@ -111,9 +113,9 @@ export default function App() {
       <BottomNav page={page} onChange={setPage} />
 
       {/* 로그인 게이트 — 앱 시작 시 표시(게스트 진입까지). 뒤에서 앱은 이미 마운트돼 엔진이 돈다. */}
-      {!entered && (
+      {!authed && (
         <div className="login-gate">
-          <LoginPage onGuest={enter} />
+          <LoginPage />
         </div>
       )}
     </>
