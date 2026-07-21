@@ -15,13 +15,18 @@ export default function GroupGrid() {
     <details id="rtc" open>
       <summary>실시간 자세 그리드 (같은 그룹)</summary>
       {!open ? (
-        <>
-          <p className="hint">
-            같은 그룹 친구들과 <b>실시간 카메라 그리드</b>로 함께 공부해요. 열면 그룹 방에 접속하고,
-            <b> 카메라 공유는 옵트인</b>(직접 켜야 보임)이에요.
-          </p>
-          <button className="rtc-view" onClick={() => setOpen(true)}>실시간 그리드 열기</button>
-        </>
+        <div className="rtc-intro">
+          <div className="rtc-intro-row">
+            <img className="rtc-intro-icon" src="/assets/ui/nav-group.png" alt="" />
+            <div className="rtc-intro-body">
+              <p className="rtc-intro-copy">같은 그룹 친구들과 <b>실시간 카메라 그리드</b>로 함께 공부해요.</p>
+              <p className="rtc-intro-sub">열면 그룹 방에 접속해요. 카메라 공유는 옵트인 — 직접 켜야만 보여요.</p>
+            </div>
+          </div>
+          <button className="rtc-open-cta" onClick={() => setOpen(true)}>
+            실시간 그리드 열기<span className="rtc-open-arrow" aria-hidden="true">›</span>
+          </button>
+        </div>
       ) : (
         <Suspense fallback={<p className="hint">불러오는 중…</p>}>
           <Room code={group.code} onClose={() => setOpen(false)} />
