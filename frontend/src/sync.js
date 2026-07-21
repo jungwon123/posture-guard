@@ -4,6 +4,10 @@
 
 export const API_BASE = "https://34-64-158-222.sslip.io";
 
+// 구글 소셜 로그인 클라이언트 ID — 빈 문자열이면 미설정(로그인 화면에 구글 버튼이 안 뜸).
+// Google Cloud 콘솔에서 OAuth 클라이언트(웹) 만들고 여기에 채우면 켜진다.
+export const GOOGLE_CLIENT_ID = "";
+
 const jparse = (k, fallback) => {
   try { return JSON.parse(localStorage.getItem(k) ?? "null") ?? fallback; } catch { return fallback; }
 };
@@ -85,6 +89,10 @@ export async function apiRegister(nickname, password, memberId) {
 }
 export async function apiLogin(nickname, password) {
   return post("login", { nickname, password });
+}
+// 구글 로그인 — GIS credential(JWT)을 서버로 보내 검증. 응답은 /api/login과 동일 형태.
+export async function apiGoogleLogin(credential, memberId) {
+  return post("google-login", { credential, memberId });
 }
 
 // 업로드 — 로그인 상태일 때만. 실패는 조용히 무시(다음 주기에 재시도).

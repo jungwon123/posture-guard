@@ -5,6 +5,7 @@ import cors from "cors";
 import rateLimit from "express-rate-limit";
 import pg from "pg";
 import http from "http";
+import https from "https"; // 구글 tokeninfo 폴백 (글로벌 fetch 없는 구버전 노드)
 import crypto from "crypto";
 import { attachSignaling } from "./signaling.js";
 import { AccessToken } from "livekit-server-sdk";
@@ -54,6 +55,9 @@ await pool.query(`
     data JSONB NOT NULL DEFAULT '{}',
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now());
   CREATE INDEX IF NOT EXISTS accounts_token_idx ON accounts (token); -- 동기화 인증 조회 경로
+  -- 구글 소셜 로그인 — 구글 전용 계정은 비밀번호가 없다(pass_hash NULL 허용)
+  ALTER TABLE accounts ADD COLUMN IF NOT EXISTS google_sub TEXT UNIQUE;
+  ALTER TABLE accounts ALTER COLUMN pass_hash DROP NOT NULL;
   -- 일별 공부/자세 집계 (월별 캘린더) — 기기별 스냅샷을 필드별 GREATEST로 병합
   CREATE TABLE IF NOT EXISTS daily_stats (
     account_id UUID REFERENCES accounts(id) ON DELETE CASCADE,
@@ -362,11 +366,85 @@ app.post("/api/login", async (req, res) => {
   const password = req.body?.password || "";
   const r = await pool.query(
     "SELECT id, pass_hash, member_id, token, data FROM accounts WHERE nickname = $1", [nickname]);
-  if (!r.rows.length || !(await verifyPassword(password, r.rows[0].pass_hash)))
+  // 구글 전용 계정(pass_hash NULL)은 비밀번호 로그인 불가 — verifyPassword 진입 전에 가드
+  if (!r.rows.length || !r.rows[0].pass_hash || !(await verifyPassword(password, r.rows[0].pass_hash)))
     return bad(res, 401, "닉네임 또는 비밀번호가 달라요");
   const token = r.rows[0].token || crypto.randomUUID();
   await pool.query("UPDATE accounts SET token = $1 WHERE id = $2", [token, r.rows[0].id]);
   return res.json({ ok: true, token, nickname, memberId: r.rows[0].member_id, data: r.rows[0].data });
+});
+
+// ── 구글 소셜 로그인 ──────────────────────────────────────────────────
+// GET JSON 헬퍼 — Node 18+ 글로벌 fetch 우선, 없으면 https 모듈 폴백. 실패는 전부 null.
+const fetchJson = (url) =>
+  typeof fetch === "function"
+    ? fetch(url).then((r) => (r.ok ? r.json() : null)).catch(() => null)
+    : new Promise((resolve) => {
+        https.get(url, (r) => {
+          let body = "";
+          r.on("data", (c) => (body += c));
+          r.on("end", () => {
+            if (r.statusCode !== 200) return resolve(null);
+            try { resolve(JSON.parse(body)); } catch { resolve(null); }
+          });
+        }).on("error", () => resolve(null));
+      });
+
+// 구글 ID 토큰(credential)으로 로그인/가입 — 응답 형태는 /api/login과 동일(프론트 공용 처리).
+app.post("/api/google-login", async (req, res) => {
+  const { GOOGLE_CLIENT_ID } = process.env;
+  if (!GOOGLE_CLIENT_ID)
+    return res.status(503).json({ error: "구글 로그인 미설정", configured: false });
+  const credential = (req.body?.credential || "").trim();
+  if (!credential) return bad(res, 401, "구글 인증에 실패했어요");
+  // 서버-서버 토큰 검증 — 구글 tokeninfo가 서명/만료를 확인해준다. aud가 우리 클라이언트여야 유효.
+  const info = await fetchJson(
+    `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`);
+  if (!info || info.aud !== GOOGLE_CLIENT_ID || !info.sub)
+    return bad(res, 401, "구글 인증에 실패했어요");
+
+  // 기존 구글 계정 → 로그인. 토큰은 기존 것 재사용(다른 기기의 동기화가 안 끊기게) — /api/login과 동일.
+  const r = await pool.query(
+    "SELECT id, nickname, member_id, token, data FROM accounts WHERE google_sub = $1", [info.sub]);
+  if (r.rows.length) {
+    const token = r.rows[0].token || crypto.randomUUID();
+    await pool.query("UPDATE accounts SET token = $1 WHERE id = $2", [token, r.rows[0].id]);
+    return res.json({ ok: true, token, nickname: r.rows[0].nickname,
+      memberId: r.rows[0].member_id, data: r.rows[0].data });
+  }
+
+  // 신규 계정 — memberId는 기기 UUID 재사용(이미 다른 계정에 묶여 있으면 새로 발급).
+  let memberId = isUuid((req.body?.memberId || "").trim()) ? (req.body.memberId || "").trim() : crypto.randomUUID();
+  const taken = await pool.query("SELECT 1 FROM accounts WHERE member_id = $1", [memberId]);
+  if (taken.rows.length) memberId = crypto.randomUUID();
+  // 닉네임은 구글 이름 기반 1~12자. UNIQUE 충돌 시 뒤에 숫자 붙여 최대 5회 재시도.
+  const base = ((info.name || "").trim() || (info.email || "").split("@")[0] || "요정").slice(0, 12) || "요정";
+  const token = crypto.randomUUID();
+  for (let i = 0; i < 5; i++) {
+    const suffix = i === 0 ? "" : String(i + 1);
+    const nickname = base.slice(0, 12 - suffix.length) + suffix;
+    try {
+      const ins = await pool.query(
+        `INSERT INTO accounts (id, nickname, pass_hash, member_id, token, google_sub)
+         VALUES ($1, $2, NULL, $3, $4, $5) RETURNING data`,
+        [crypto.randomUUID(), nickname, memberId, token, info.sub]);
+      return res.json({ ok: true, token, nickname, memberId, data: ins.rows[0].data });
+    } catch (e) {
+      if (e.code !== "23505") throw e; // unique 위반만 재시도 대상
+      const c = e.constraint || "";
+      if (c.includes("google_sub")) { // 동시 가입 경합 — 방금 생긴 계정으로 로그인
+        const dup = await pool.query(
+          "SELECT nickname, member_id, token, data FROM accounts WHERE google_sub = $1", [info.sub]);
+        if (dup.rows.length)
+          return res.json({ ok: true, token: dup.rows[0].token, nickname: dup.rows[0].nickname,
+            memberId: dup.rows[0].member_id, data: dup.rows[0].data });
+        continue;
+      }
+      if (c.includes("member_id")) { memberId = crypto.randomUUID(); continue; } // 기기 충돌 → 새 UUID
+      // 닉네임 충돌 → 다음 suffix로 재시도
+    }
+  }
+  return bad(res, 409, "닉네임 만들기에 실패했어요 — 다시 시도해주세요");
 });
 
 // 데이터 업로드 — 토큰 인증, 64KB 제한.

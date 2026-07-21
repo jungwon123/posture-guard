@@ -453,6 +453,8 @@
 .login-error { font-size: 12.5px; color: var(--bad); text-align: left; line-height: 1.5; }
 .login-switch { background: none; border: none; color: var(--dim); font-size: 12px; padding: 4px; }
 .login-switch:hover { color: var(--text); border: none; }
+/* 구글 로그인 버튼 자리 — GIS(renderButton)가 iframe 버튼을 그려 넣음. GOOGLE_CLIENT_ID 설정 시에만 렌더 */
+.login-google { display: flex; justify-content: center; margin-top: 2px; }
 
 /* 계정 카드 (설정 페이지) — 로그인 상태 표시 + 로그아웃/로그인 */
 .account-card { display: flex; align-items: center; gap: 12px; }
@@ -863,13 +865,17 @@
 
 /* ── 숲 컨셉 디자인 에셋 시스템 — 버튼/컴포넌트 공통 (btn-frame·wide·pill, ui-divider, ui-corner-leaf) ── */
 /* 표준 사각 액션 버튼: 덩굴 프레임 */
-#btn-notify, #btn-pip, #btn-face, #btn-report, #btn-test, #btn-cam-retry,
-#btn-group-join, .rtc-view, .login-form button[type="submit"],
+#btn-notify, #btn-pip, #btn-face, #btn-report, #btn-test,
+#btn-group-join, .login-form button[type="submit"],
 .card > button, .card .row button {
   background: url("/assets/ui/btn-frame.png") center / 100% 100% no-repeat, var(--panel);
   border-color: transparent;
 }
-#btn-group-create { background: url("/assets/ui/btn-frame.png") center / 100% 100% no-repeat, var(--accent); border-color: transparent; }
+/* 진한 글자색(#101418) 버튼은 accent 배경 유지 — 패널 배경이면 글자가 안 보임 */
+#btn-group-create, #btn-cam-retry, .rtc-view {
+  background: url("/assets/ui/btn-frame.png") center / 100% 100% no-repeat, var(--accent);
+  border-color: transparent;
+}
 /* 프레임 안쪽 콘텐츠 여백 — 줄기 두께에 맞춰 패딩 보정 */
 #btn-notify, #btn-pip, #btn-face, #btn-report, #btn-test, #btn-cam-retry,
 #btn-group-join, .rtc-view, .login-form button[type="submit"],
