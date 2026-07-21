@@ -12,13 +12,16 @@ const jparse = (k, fallback) => {
   try { return JSON.parse(localStorage.getItem(k) ?? "null") ?? fallback; } catch { return fallback; }
 };
 
-// ── 로그인 상태 (pg_auth = {token, nickname}) ──
+// ── 로그인 상태 (pg_auth = {token, nickname, needsNickname?}) ──
+// needsNickname: 가입/첫 구글 로그인 직후 닉네임 온보딩이 필요하면 true. 온보딩 완료 시 키 자체를 제거.
 export function getAuth() {
   const a = jparse("pg_auth", null);
   return a && a.token ? a : null;
 }
-export function setAuth(token, nickname) {
-  localStorage.setItem("pg_auth", JSON.stringify({ token, nickname }));
+export function setAuth(token, nickname, needsNickname) {
+  const auth = { token, nickname };
+  if (needsNickname) auth.needsNickname = true; // falsy면 키 미포함(기존 사용자와 동일 형태)
+  localStorage.setItem("pg_auth", JSON.stringify(auth));
 }
 export function clearAuth() { localStorage.removeItem("pg_auth"); }
 
@@ -84,11 +87,15 @@ async function post(path, body) {
 // 네트워크 오류(status 없음)는 로그아웃하지 않는다.
 const dropAuthIf401 = (e) => { if (e && e.status === 401) clearAuth(); };
 
-export async function apiRegister(nickname, password, memberId) {
-  return post("register", { nickname, password, memberId });
+export async function apiRegister(email, password, memberId) {
+  return post("register", { email, password, memberId });
 }
-export async function apiLogin(nickname, password) {
-  return post("login", { nickname, password });
+export async function apiLogin(email, password) {
+  return post("login", { email, password });
+}
+// 닉네임 설정(온보딩) — 성공 시 {ok, nickname}. 400 "닉네임은 2~12자"·409 "이미 있는 닉네임이에요"는 error로 throw.
+export async function apiSetNickname(token, nickname) {
+  return post("set-nickname", { token, nickname });
 }
 // 구글 로그인 — GIS credential(JWT)을 서버로 보내 검증. 응답은 /api/login과 동일 형태.
 export async function apiGoogleLogin(credential, memberId) {

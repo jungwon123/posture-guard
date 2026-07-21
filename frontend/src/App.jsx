@@ -14,6 +14,7 @@ import GroupPanel from "./components/GroupPanel.jsx";
 import GroupGrid from "./components/GroupGrid.jsx";
 import DressUpPage from "./components/DressUpPage.jsx";
 import LoginPage from "./components/LoginPage.jsx";
+import OnboardingNickname from "./components/OnboardingNickname.jsx";
 import ReportOverlay from "./components/ReportOverlay.jsx";
 import InstallBanner from "./components/InstallBanner.jsx";
 import BottomNav from "./components/BottomNav.jsx";
@@ -57,7 +58,7 @@ function AccountCard() {
 export default function App() {
   const [page, setPage] = useState("main");
   const [showStats, setShowStats] = useState(false);            // 통계 시트(차트·기록)
-  const authed = !!getAuth(); // 로그인 게이트 — 계정 필수(게스트 없음)
+  const auth = getAuth(); // 로그인 게이트 — 계정 필수(게스트 없음)
   useEffect(() => { initApp(); }, []);
   const show = (id) => ({ display: page === id ? undefined : "none" });
 
@@ -112,12 +113,18 @@ export default function App() {
       <Buddy />
       <BottomNav page={page} onChange={setPage} />
 
-      {/* 로그인 게이트 — 앱 시작 시 표시(게스트 진입까지). 뒤에서 앱은 이미 마운트돼 엔진이 돈다. */}
-      {!authed && (
+      {/* 게이트 — ① 미로그인 → 로그인 ② 닉네임 미설정(needsNickname) → 온보딩 ③ 통과.
+          기존 사용자는 pg_auth에 needsNickname이 없어(undefined=falsy) 온보딩을 건너뛴다.
+          뒤에서 앱은 이미 마운트돼 엔진이 돈다. */}
+      {!auth ? (
         <div className="login-gate">
           <LoginPage />
         </div>
-      )}
+      ) : auth.needsNickname ? (
+        <div className="login-gate">
+          <OnboardingNickname />
+        </div>
+      ) : null}
     </>
   );
 }

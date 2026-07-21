@@ -58,6 +58,9 @@ await pool.query(`
   -- 구글 소셜 로그인 — 구글 전용 계정은 비밀번호가 없다(pass_hash NULL 허용)
   ALTER TABLE accounts ADD COLUMN IF NOT EXISTS google_sub TEXT UNIQUE;
   ALTER TABLE accounts ALTER COLUMN pass_hash DROP NOT NULL;
+  -- 이메일 기반 계정: 기존 계정은 onboarded=true(온보딩 안 뜸), 새 가입만 명시적으로 false로 INSERT
+  ALTER TABLE accounts ADD COLUMN IF NOT EXISTS email TEXT UNIQUE;
+  ALTER TABLE accounts ADD COLUMN IF NOT EXISTS onboarded BOOLEAN NOT NULL DEFAULT true;
   -- 일별 공부/자세 집계 (월별 캘린더) — 기기별 스냅샷을 필드별 GREATEST로 병합
   CREATE TABLE IF NOT EXISTS daily_stats (
     account_id UUID REFERENCES accounts(id) ON DELETE CASCADE,
@@ -335,43 +338,75 @@ const verifyPassword = async (password, stored) => {
 };
 const MAX_SYNC_BYTES = 64 * 1024;
 
-// 계정 등록 — 닉네임 전역 유니크, 기기(memberId)당 1계정.
+// 계정 등록 — 이메일 전역 유니크, 기기(memberId)당 1계정.
+// 닉네임은 서버가 임시 생성(이메일 로컬파트) → 온보딩(/api/set-nickname)에서 확정.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 app.post("/api/register", async (req, res) => {
-  const nickname = (req.body?.nickname || "").trim();
+  const email = (req.body?.email || "").trim().toLowerCase();
   const password = req.body?.password || "";
   const memberId = (req.body?.memberId || "").trim();
-  if (nickname.length < 2 || nickname.length > 12) return bad(res, 400, "닉네임은 2~12자");
+  if (!EMAIL_RE.test(email) || email.length > 254) return bad(res, 400, "이메일 형식을 확인해주세요");
   if (password.length < 4 || password.length > 64) return bad(res, 400, "비밀번호는 4~64자");
   if (!isUuid(memberId)) return bad(res, 400, "잘못된 기기 ID");
   const passHash = await hashPassword(password);
   const token = crypto.randomUUID();
-  try {
-    await pool.query(
-      `INSERT INTO accounts (id, nickname, pass_hash, member_id, token)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [crypto.randomUUID(), nickname, passHash, memberId, token]);
-  } catch (e) {
-    if (e.code === "23505") { // unique 위반 — 어느 제약인지로 메시지 분기
-      if ((e.constraint || "").includes("member_id")) return bad(res, 409, "이 기기는 이미 계정이 있어요");
-      return bad(res, 409, "이미 있는 닉네임이에요");
+  // 임시 닉네임: 이메일 로컬파트 1~12자. UNIQUE 충돌 시 뒤에 숫자 붙여 최대 5회 재시도.
+  const base = email.split("@")[0].slice(0, 12);
+  // 기기 ID가 이미 다른 계정에 묶여 있으면(공용 기기에서 친구가 가입) 새 ID를 발급해 계속 진행.
+  let effMemberId = memberId;
+  for (let i = 0; i < 6; i++) {
+    const suffix = i === 0 ? "" : String(i + 1);
+    const nickname = base.slice(0, 12 - suffix.length) + suffix;
+    try {
+      await pool.query(
+        `INSERT INTO accounts (id, email, nickname, pass_hash, member_id, token, onboarded)
+         VALUES ($1, $2, $3, $4, $5, $6, false)`,
+        [crypto.randomUUID(), email, nickname, passHash, effMemberId, token]);
+      return res.json({ ok: true, token, nickname, memberId: effMemberId, needsNickname: true });
+    } catch (e) {
+      if (e.code !== "23505") throw e; // unique 위반만 분기/재시도 대상
+      const c = e.constraint || "";
+      if (c.includes("email")) return bad(res, 409, "이미 가입된 이메일이에요");
+      if (c.includes("member_id")) { effMemberId = crypto.randomUUID(); i--; continue; } // 새 기기 ID로 재시도
+      // 닉네임 충돌 → 다음 suffix로 재시도
     }
-    throw e;
   }
-  return res.json({ ok: true, token, nickname, memberId });
+  return bad(res, 409, "닉네임 만들기에 실패했어요 — 다시 시도해주세요");
 });
 
 // 로그인 — 저장된 동기화 데이터 반환. 토큰은 기존 것 재사용(다른 기기의 동기화가 안 끊기게).
 app.post("/api/login", async (req, res) => {
-  const nickname = (req.body?.nickname || "").trim();
+  const email = (req.body?.email || "").trim().toLowerCase();
   const password = req.body?.password || "";
   const r = await pool.query(
-    "SELECT id, pass_hash, member_id, token, data FROM accounts WHERE nickname = $1", [nickname]);
+    "SELECT id, nickname, pass_hash, member_id, token, data, onboarded FROM accounts WHERE email = $1", [email]);
   // 구글 전용 계정(pass_hash NULL)은 비밀번호 로그인 불가 — verifyPassword 진입 전에 가드
   if (!r.rows.length || !r.rows[0].pass_hash || !(await verifyPassword(password, r.rows[0].pass_hash)))
-    return bad(res, 401, "닉네임 또는 비밀번호가 달라요");
+    return bad(res, 401, "이메일 또는 비밀번호가 달라요");
   const token = r.rows[0].token || crypto.randomUUID();
   await pool.query("UPDATE accounts SET token = $1 WHERE id = $2", [token, r.rows[0].id]);
-  return res.json({ ok: true, token, nickname, memberId: r.rows[0].member_id, data: r.rows[0].data });
+  return res.json({ ok: true, token, nickname: r.rows[0].nickname, memberId: r.rows[0].member_id,
+    data: r.rows[0].data, needsNickname: !r.rows[0].onboarded });
+});
+
+// 온보딩 닉네임 확정 — accounts.nickname 갱신 + onboarded=true.
+// members.nickname도 반영(리더보드 표기 일치) — memberships는 그룹별 닉네임이라 건드리지 않음.
+app.post("/api/set-nickname", async (req, res) => {
+  const token = (req.body?.token || "").trim();
+  const nickname = (req.body?.nickname || "").trim();
+  if (!isUuid(token)) return bad(res, 401, "다시 로그인해주세요");
+  const a = await pool.query("SELECT id, member_id FROM accounts WHERE token = $1", [token]);
+  if (!a.rows.length) return bad(res, 401, "다시 로그인해주세요");
+  if (nickname.length < 2 || nickname.length > 12) return bad(res, 400, "닉네임은 2~12자");
+  try {
+    await pool.query("UPDATE accounts SET nickname = $1, onboarded = true WHERE id = $2",
+      [nickname, a.rows[0].id]);
+  } catch (e) {
+    if (e.code === "23505") return bad(res, 409, "이미 있는 닉네임이에요"); // 다른 계정이 선점
+    throw e;
+  }
+  await pool.query("UPDATE members SET nickname = $1 WHERE id = $2", [nickname, a.rows[0].member_id]);
+  return res.json({ ok: true, nickname });
 });
 
 // ── 구글 소셜 로그인 ──────────────────────────────────────────────────
@@ -403,17 +438,32 @@ app.post("/api/google-login", async (req, res) => {
   if (!info || info.aud !== GOOGLE_CLIENT_ID || !info.sub)
     return bad(res, 401, "구글 인증에 실패했어요");
 
-  // 기존 구글 계정 → 로그인. 토큰은 기존 것 재사용(다른 기기의 동기화가 안 끊기게) — /api/login과 동일.
+  const email = (info.email || "").trim().toLowerCase();
+
+  // ① google_sub 일치 → 로그인. 토큰은 기존 것 재사용(다른 기기의 동기화가 안 끊기게) — /api/login과 동일.
   const r = await pool.query(
-    "SELECT id, nickname, member_id, token, data FROM accounts WHERE google_sub = $1", [info.sub]);
+    "SELECT id, nickname, member_id, token, data, onboarded FROM accounts WHERE google_sub = $1", [info.sub]);
   if (r.rows.length) {
     const token = r.rows[0].token || crypto.randomUUID();
     await pool.query("UPDATE accounts SET token = $1 WHERE id = $2", [token, r.rows[0].id]);
     return res.json({ ok: true, token, nickname: r.rows[0].nickname,
-      memberId: r.rows[0].member_id, data: r.rows[0].data });
+      memberId: r.rows[0].member_id, data: r.rows[0].data, needsNickname: !r.rows[0].onboarded });
   }
 
-  // 신규 계정 — memberId는 기기 UUID 재사용(이미 다른 계정에 묶여 있으면 새로 발급).
+  // ② 같은 이메일의 일반가입 계정 → google_sub 연결 후 로그인 (계정 병합).
+  if (email) {
+    const m = await pool.query(
+      "SELECT id, nickname, member_id, token, data, onboarded FROM accounts WHERE email = $1", [email]);
+    if (m.rows.length) {
+      const token = m.rows[0].token || crypto.randomUUID();
+      await pool.query("UPDATE accounts SET google_sub = $1, token = $2 WHERE id = $3",
+        [info.sub, token, m.rows[0].id]);
+      return res.json({ ok: true, token, nickname: m.rows[0].nickname,
+        memberId: m.rows[0].member_id, data: m.rows[0].data, needsNickname: !m.rows[0].onboarded });
+    }
+  }
+
+  // ③ 신규 계정 — memberId는 기기 UUID 재사용(이미 다른 계정에 묶여 있으면 새로 발급).
   let memberId = isUuid((req.body?.memberId || "").trim()) ? (req.body.memberId || "").trim() : crypto.randomUUID();
   const taken = await pool.query("SELECT 1 FROM accounts WHERE member_id = $1", [memberId]);
   if (taken.rows.length) memberId = crypto.randomUUID();
@@ -425,22 +475,23 @@ app.post("/api/google-login", async (req, res) => {
     const nickname = base.slice(0, 12 - suffix.length) + suffix;
     try {
       const ins = await pool.query(
-        `INSERT INTO accounts (id, nickname, pass_hash, member_id, token, google_sub)
-         VALUES ($1, $2, NULL, $3, $4, $5) RETURNING data`,
-        [crypto.randomUUID(), nickname, memberId, token, info.sub]);
-      return res.json({ ok: true, token, nickname, memberId, data: ins.rows[0].data });
+        `INSERT INTO accounts (id, email, nickname, pass_hash, member_id, token, google_sub, onboarded)
+         VALUES ($1, $2, $3, NULL, $4, $5, $6, false) RETURNING data`,
+        [crypto.randomUUID(), email || null, nickname, memberId, token, info.sub]);
+      return res.json({ ok: true, token, nickname, memberId, data: ins.rows[0].data, needsNickname: true });
     } catch (e) {
       if (e.code !== "23505") throw e; // unique 위반만 재시도 대상
       const c = e.constraint || "";
       if (c.includes("google_sub")) { // 동시 가입 경합 — 방금 생긴 계정으로 로그인
         const dup = await pool.query(
-          "SELECT nickname, member_id, token, data FROM accounts WHERE google_sub = $1", [info.sub]);
+          "SELECT nickname, member_id, token, data, onboarded FROM accounts WHERE google_sub = $1", [info.sub]);
         if (dup.rows.length)
           return res.json({ ok: true, token: dup.rows[0].token, nickname: dup.rows[0].nickname,
-            memberId: dup.rows[0].member_id, data: dup.rows[0].data });
+            memberId: dup.rows[0].member_id, data: dup.rows[0].data, needsNickname: !dup.rows[0].onboarded });
         continue;
       }
       if (c.includes("member_id")) { memberId = crypto.randomUUID(); continue; } // 기기 충돌 → 새 UUID
+      if (c.includes("email")) return bad(res, 409, "이미 가입된 이메일이에요"); // ②와 INSERT 사이 경합 — 재시도 유도
       // 닉네임 충돌 → 다음 suffix로 재시도
     }
   }

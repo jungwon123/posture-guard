@@ -937,4 +937,23 @@ details[open] > summary::before { transform: none; }
 
 /* 로그인 폼 상시 노출 (게스트 제거) */
 .login-more-open { margin-top: 6px; }
-.login-formhead { font-size: 12.5px; font-weight: 700; color: var(--dim); text-align: center; margin: 0 0 8px; }
+
+/* ── 인풋 공통: 얇은 세이지 프레임(input-frame, 우측 잎) — 브라우저 기본 흰 배경 제거 ── */
+input[type="text"], input[type="password"], input[type="email"] {
+  background: url("/assets/ui/input-frame.png") center / 100% 100% no-repeat, var(--panel);
+  border: 1px solid transparent; border-radius: 12px; color: var(--text);
+  padding: 11px 18px; font-size: 14px; font-family: inherit; outline: none;
+}
+input[type="text"]:focus, input[type="password"]:focus, input[type="email"]:focus {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+input::placeholder { color: var(--dim); }
+/* 좁은 인풋(6자리 코드, 104px)은 860px 프레임이 옆으로 뭉개짐 — 프레임 없이 색만 맞춤 */
+#group-code { background: var(--panel); border-color: var(--line); }
+
+/* 온보딩 시작 버튼 — 로그인 카드 primary와 같은 accent 덩굴 프레임
+   (.login-form button[type="submit"] 공통 규칙(panel)보다 뒤에서 덮어씀) */
+.login-form button.login-primary {
+  background: url("/assets/ui/btn-frame.png") center / 100% 100% no-repeat, var(--accent);
+  color: #101418; padding: 12px 18px;
+}
