@@ -124,7 +124,11 @@ let events = store.loadEvents();
   if (!last || !["GOOD", "CAUTION", "BAD"].includes(last.to)) return;
   const now = nowSec();
   const cut = Math.max(last.t, Math.min(lastActiveSec || last.t, now));
-  if (now - cut > IDLE_GAP_SEC) { events.push({ t: cut, from: last.to, to: "AWAY" }); store.saveEvents(events); }
+  // 페이지 로드 직후엔 측정이 절대 돌고 있지 않으므로 조건 없이 항상 봉인한다.
+  // (직전 활동이 5초 이내라고 건너뛰면, 측정 중 새로고침 시 열린 세그먼트가 남아
+  //  카메라를 다시 켤 때까지 공부시간·바른자세%가 벽시계만큼 계속 자란다.)
+  events.push({ t: cut, from: last.to, to: "AWAY" });
+  store.saveEvents(events);
 })();
 
 // ── 눈 깜빡임 — 주기 샘플링. 얼굴 모델은 머리자세 판정용으로 이미 로드돼 있어 추가 비용 0, 샘플 창에서만 카운트 ──
