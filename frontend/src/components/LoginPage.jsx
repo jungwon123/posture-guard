@@ -96,7 +96,6 @@ export default function LoginPage() {
       }
       setAuth(r.token, r.nickname || nick);
       if (r.memberId) localStorage.setItem("pg_member_id", r.memberId); // 서버 ID 채택(기기 간 통일)
-      localStorage.setItem("pg_entered", "1");
       location.reload(); // 엔진·React가 복원된 데이터로 다시 부팅
     } catch (err) {
       setError(err.message); // 서버 error 메시지 그대로 (409 닉네임 중복, 401 불일치 등)
