@@ -5,6 +5,7 @@ import cors from "cors";
 import rateLimit from "express-rate-limit";
 import pg from "pg";
 import http from "http";
+import crypto from "crypto";
 import { attachSignaling } from "./signaling.js";
 import { AccessToken } from "livekit-server-sdk";
 
@@ -43,6 +44,15 @@ await pool.query(`
   INSERT INTO memberships (member_id, group_id, nickname)
     SELECT id, group_id, nickname FROM members WHERE group_id IS NOT NULL
     ON CONFLICT (member_id, group_id) DO NOTHING;
+  -- 계정 + 데이터 동기화 (id는 서버에서 crypto.randomUUID로 생성 — gen_random_uuid 의존 없음)
+  CREATE TABLE IF NOT EXISTS accounts (
+    id UUID PRIMARY KEY,
+    nickname TEXT UNIQUE NOT NULL,
+    pass_hash TEXT NOT NULL,
+    member_id UUID UNIQUE NOT NULL,
+    token UUID,
+    data JSONB NOT NULL DEFAULT '{}',
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now());
 `);
 
 const app = express();
@@ -280,6 +290,87 @@ app.post("/api/rtc-token", async (req, res) => {
   at.addGrant({ roomJoin: true, room: `pg-${code}`, canPublish: true, canSubscribe: true, canPublishData: true });
   const token = await at.toJwt(); // v2: async
   return res.json({ token, url: LIVEKIT_URL, room: `pg-${code}`, configured: true });
+});
+
+// ── 계정 + 데이터 동기화 ──────────────────────────────────────────────
+// 비밀번호 해시: node 내장 scrypt (salt 16바이트 랜덤, "salt:hash" hex 저장). 외부 의존성 없음.
+const scryptAsync = (password, salt) =>
+  new Promise((resolve, reject) =>
+    crypto.scrypt(password, salt, 64, (err, buf) => (err ? reject(err) : resolve(buf))));
+const hashPassword = async (password) => {
+  const salt = crypto.randomBytes(16).toString("hex");
+  const buf = await scryptAsync(password, salt);
+  return `${salt}:${buf.toString("hex")}`;
+};
+const verifyPassword = async (password, stored) => {
+  const [salt, hash] = (stored || "").split(":");
+  if (!salt || !hash) return false;
+  const buf = await scryptAsync(password, salt);
+  const expected = Buffer.from(hash, "hex");
+  return buf.length === expected.length && crypto.timingSafeEqual(buf, expected);
+};
+const MAX_SYNC_BYTES = 64 * 1024;
+
+// 계정 등록 — 닉네임 전역 유니크, 기기(memberId)당 1계정.
+app.post("/api/register", async (req, res) => {
+  const nickname = (req.body?.nickname || "").trim();
+  const password = req.body?.password || "";
+  const memberId = (req.body?.memberId || "").trim();
+  if (nickname.length < 2 || nickname.length > 12) return bad(res, 400, "닉네임은 2~12자");
+  if (password.length < 4 || password.length > 64) return bad(res, 400, "비밀번호는 4~64자");
+  if (!isUuid(memberId)) return bad(res, 400, "잘못된 기기 ID");
+  const passHash = await hashPassword(password);
+  const token = crypto.randomUUID();
+  try {
+    await pool.query(
+      `INSERT INTO accounts (id, nickname, pass_hash, member_id, token)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [crypto.randomUUID(), nickname, passHash, memberId, token]);
+  } catch (e) {
+    if (e.code === "23505") { // unique 위반 — 어느 제약인지로 메시지 분기
+      if ((e.constraint || "").includes("member_id")) return bad(res, 409, "이 기기는 이미 계정이 있어요");
+      return bad(res, 409, "이미 있는 닉네임이에요");
+    }
+    throw e;
+  }
+  return res.json({ ok: true, token, nickname, memberId });
+});
+
+// 로그인 — 저장된 동기화 데이터 반환. 토큰은 기존 것 재사용(다른 기기의 동기화가 안 끊기게).
+app.post("/api/login", async (req, res) => {
+  const nickname = (req.body?.nickname || "").trim();
+  const password = req.body?.password || "";
+  const r = await pool.query(
+    "SELECT id, pass_hash, member_id, token, data FROM accounts WHERE nickname = $1", [nickname]);
+  if (!r.rows.length || !(await verifyPassword(password, r.rows[0].pass_hash)))
+    return bad(res, 401, "닉네임 또는 비밀번호가 달라요");
+  const token = r.rows[0].token || crypto.randomUUID();
+  await pool.query("UPDATE accounts SET token = $1 WHERE id = $2", [token, r.rows[0].id]);
+  return res.json({ ok: true, token, nickname, memberId: r.rows[0].member_id, data: r.rows[0].data });
+});
+
+// 데이터 업로드 — 토큰 인증, 64KB 제한.
+app.post("/api/sync", async (req, res) => {
+  const token = (req.body?.token || "").trim();
+  const data = req.body?.data;
+  if (!isUuid(token)) return bad(res, 401, "다시 로그인해주세요");
+  if (!data || typeof data !== "object" || Array.isArray(data)) return bad(res, 400, "잘못된 데이터");
+  if (JSON.stringify(data).length > MAX_SYNC_BYTES) return bad(res, 413, "데이터가 너무 커요 (64KB 제한)");
+  const r = await pool.query(
+    "UPDATE accounts SET data = $1, updated_at = now() WHERE token = $2 RETURNING id",
+    [JSON.stringify(data), token]);
+  if (!r.rows.length) return bad(res, 401, "다시 로그인해주세요");
+  return res.json({ ok: true });
+});
+
+// 데이터 다운로드 — 다른 기기에서 이어하기.
+app.post("/api/sync-pull", async (req, res) => {
+  const token = (req.body?.token || "").trim();
+  if (!isUuid(token)) return bad(res, 401, "다시 로그인해주세요");
+  const r = await pool.query(
+    "SELECT data, nickname, member_id FROM accounts WHERE token = $1", [token]);
+  if (!r.rows.length) return bad(res, 401, "다시 로그인해주세요");
+  return res.json({ ok: true, data: r.rows[0].data, nickname: r.rows[0].nickname, memberId: r.rows[0].member_id });
 });
 
 const server = http.createServer(app);

@@ -17,6 +17,34 @@ import InstallBanner from "./components/InstallBanner.jsx";
 import BottomNav from "./components/BottomNav.jsx";
 import Buddy from "./components/Buddy.jsx";
 import { initApp } from "./app.js";
+import { getAuth, clearAuth } from "./sync.js";
+
+// 계정 카드(설정 페이지) — 로그인 상태·동기화 안내 + 로그아웃/로그인 진입
+function AccountCard({ onLogin }) {
+  const auth = getAuth();
+  const logout = () => { clearAuth(); location.reload(); };
+  return (
+    <div className="card account-card">
+      {auth ? (
+        <>
+          <div className="account-info">
+            <b>{auth.nickname}님</b>
+            <span className="account-sub">동기화 중 · 포인트와 요정이 계정에 백업돼요</span>
+          </div>
+          <button type="button" onClick={logout}>로그아웃</button>
+        </>
+      ) : (
+        <>
+          <div className="account-info">
+            <b>게스트로 사용 중</b>
+            <span className="account-sub">로그인하면 포인트·요정을 어느 기기서든 이어써요</span>
+          </div>
+          <button type="button" className="primary" onClick={onLogin}>로그인</button>
+        </>
+      )}
+    </div>
+  );
+}
 
 // 페이지들은 전부 마운트한 채 표시만 전환한다 — 어느 탭에 있든 카메라 감지가 계속
 // 돌아야 하고(상점 구경 중에도 감시), 엔진(initApp)이 id로 잡은 요소가 사라지면 안 되기 때문.
@@ -55,6 +83,7 @@ export default function App() {
       {/* 설정 페이지 — 하단 '설정' 탭. 출석·알림·눈깜빡임 설정을 여기로 모음 */}
       <div className="page" style={show("settings")}>
         <div className="page-title">설정</div>
+        <AccountCard onLogin={() => { localStorage.removeItem("pg_entered"); setEntered(false); }} />
         <AttendanceCard />
         <SettingsPanel />
         <EyeCarePanel />

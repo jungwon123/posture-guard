@@ -8,6 +8,7 @@ import {
 import { AbsSmoother, extractAbsolute, finishAbsRef, absPenalty, absDominant, headPoseFromMatrix,
   extractGuidePoints, finishGuide, projectGuide } from "./posture3d.js";
 import { Rewards, MELODIES, SKINS, SHOP, TIERS, computeReport } from "./reward.js";
+import { getAuth, syncPull, mergeData, startSyncLoop } from "./sync.js";
 
 // React 마운트 후 1회 실행 (엔진 계층 — 카메라 루프·판정·알림·PiP)
 let __started = false;
@@ -30,6 +31,7 @@ const els = {
   btnTest: $("btn-test"), shopList: $("shop-list"),
   blink: $("blink"), setBlink: $("set-blink"), blinkStatus: $("blink-status"),
   startCta: $("start-cta"), btnStartHero: $("btn-start-hero"),
+  camRetry: $("cam-retry"), btnCamRetry: $("btn-cam-retry"),
   calibGuide: $("calib-guide"), calibCount: $("calib-count"),
   awayNotice: $("away-notice"), centerPop: $("center-pop"), centerPopCard: $("center-pop-card"),
 };
@@ -316,6 +318,16 @@ function flashPoints() {
 }
 
 // ── 카메라 + MediaPipe ──
+// 카메라 획득 — start()와 백그라운드 복귀 재개(resumeCamera)가 공유. 같은 constraints로 재획득.
+const CAM_CONSTRAINTS = { video: { width: 640, height: 480 }, audio: false };
+async function acquireCamera() {
+  const stream = await navigator.mediaDevices.getUserMedia(CAM_CONSTRAINTS);
+  const old = els.cam.srcObject;
+  if (old && old !== stream) old.getTracks().forEach((t) => t.stop());
+  els.cam.srcObject = stream;
+  await els.cam.play();
+}
+
 async function start() {
   els.btnStart.disabled = true;
   els.msg.textContent = landmarker ? "카메라 켜는 중…" : "모델 로딩 중…";
@@ -337,11 +349,7 @@ async function start() {
         minPoseDetectionConfidence: 0.6, minTrackingConfidence: 0.6,
       });
     }
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { width: 640, height: 480 }, audio: false,
-    });
-    els.cam.srcObject = stream;
-    await els.cam.play();
+    await acquireCamera();
   } catch (e) {
     els.msg.textContent = "시작 실패: " + e.message + " (카메라 권한을 확인하세요)";
     els.btnStart.disabled = false;
@@ -385,6 +393,7 @@ function stop() {
   window.__pgLive = { running: false }; // 도우미에게 카메라 꺼짐 알림
   const s = els.cam.srcObject;
   if (s) { s.getTracks().forEach((t) => t.stop()); els.cam.srcObject = null; }
+  show(els.camRetry, false); // 측정 종료 — 카메라 재시작 오버레이도 정리
   blinkSampling = false;
   els.btnStart.textContent = "공부 시작";
   els.btnStart.classList.remove("danger");
@@ -417,6 +426,52 @@ function showSessionSummary() {
     </div>
     <div class="cp-sub">카메라가 꺼졌습니다 · 자세히 보려면 [오늘 리포트]</div>`, 3600);
 }
+
+// ── 카메라 백그라운드 복귀 재개 ──
+// 다른 앱에 다녀오면(특히 모바일) OS가 카메라를 회수해 트랙이 죽고 화면이 검게 멈춘다.
+// 복귀 이벤트(visibilitychange·pageshow) 시점에 트랙 상태를 검사해 자동 재획득한다.
+// 세션(측정 기록·캘리브 기준)은 그대로 이어진다 — start()의 세션 로직은 건드리지 않는다.
+function camTrackDead() {
+  const t = els.cam.srcObject?.getVideoTracks?.()[0];
+  return !t || t.readyState === "ended" || t.muted;
+}
+let camResuming = false;
+async function resumeCamera() {
+  if (!running || camResuming) return;
+  if (!camTrackDead()) { show(els.camRetry, false); return; }
+  camResuming = true;
+  try {
+    // muted는 복귀 직후 잠깐일 수 있다 — 트랙이 살아있으면 1초만 기다렸다 재검사(불필요한 재획득 방지)
+    const t = els.cam.srcObject?.getVideoTracks?.()[0];
+    if (t && t.readyState !== "ended" && t.muted) {
+      await new Promise((r) => setTimeout(r, 1000));
+      if (!running || !camTrackDead()) { show(els.camRetry, false); return; }
+    }
+    await acquireCamera();
+    show(els.camRetry, false);
+    els.msg.textContent = "카메라를 다시 켰어요. 측정을 이어가요.";
+  } catch {
+    // 자동 재획득 실패(권한·OS 정책) — 사용자 제스처로 다시 켜는 오버레이 표시
+    show(els.camRetry, true);
+  } finally {
+    camResuming = false;
+  }
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden) resumeCamera(); });
+window.addEventListener("pageshow", () => resumeCamera());
+if (els.btnCamRetry) els.btnCamRetry.onclick = async () => { // 수동 재시도(사용자 제스처)
+  if (!running) return;
+  els.btnCamRetry.disabled = true;
+  try {
+    await acquireCamera();
+    show(els.camRetry, false);
+    els.msg.textContent = "카메라를 다시 켰어요. 측정을 이어가요.";
+  } catch (e) {
+    els.msg.textContent = "카메라를 다시 켜지 못했어요: " + e.message + " (브라우저 카메라 권한을 확인하세요)";
+  } finally {
+    els.btnCamRetry.disabled = false;
+  }
+};
 
 // ── 얼굴 모델 로드 (머리자세 판정 + 눈 깜빡임 공용) ──
 async function ensureFaceModel() {
@@ -1506,6 +1561,19 @@ $("equip-grid")?.addEventListener("click", (e) => {
 initSettings();
 renderShop();
 renderSummary();
+
+// ── 서버 동기화 (로그인 계정) — 부팅 시 서버 최신본과 max/합집합 병합 후 60초 주기 업로드 시작 ──
+if (getAuth()) {
+  syncPull().then((data) => {
+    const { data: merged, changed } = mergeData(data);
+    if (changed) { // 병합 결과를 메모리의 rewards에도 반영 — 다음 _save가 옛 값으로 덮지 않게
+      rewards.points = merged.points;
+      rewards.shop = { ...rewards.shop, ...merged.shop };
+      els.points.textContent = `${rewards.points}P`;
+      renderShop();
+    }
+  }).finally(() => startSyncLoop()); // 병합이 끝난 뒤에 업로드 시작(옛 로컬로 서버를 덮지 않게)
+}
 
 // 전방머리(headForward) 실기기 검증 오버레이 — URL 에 ?fwd=1 일 때만. 학생 화면엔 안 뜬다.
 // 사용법: 바른자세 기준 등록(캘리브) 후, 정자세 vs 거북목에서 Δ(현재-기준)가 유의미하게 갈리는지 관찰.

@@ -33,6 +33,13 @@ export default function MainPanels() {
           <div className="away-sub">자리를 비운 것 같아요.<br />다시 앉으면 이어서 측정해요</div>
         </div>
 
+        {/* 카메라 트랙 끊김(백그라운드 복귀) — 자동 재개 실패 시 수동 재시작 (표시는 엔진이 토글) */}
+        <div id="cam-retry">
+          <div className="away-title">카메라가 꺼졌어요</div>
+          <div className="away-sub">다른 앱에 다녀오면 카메라가 멈출 수 있어요.<br />다시 켜면 측정이 이어져요</div>
+          <button id="btn-cam-retry" className="primary">카메라 다시 켜기</button>
+        </div>
+
         {/* 범용 중앙 팝업 — 등록 완료·종료 안내 등 (app.js가 내용 채움) */}
         <div id="center-pop"><div className="center-pop-card" id="center-pop-card"></div></div>
       </div>
