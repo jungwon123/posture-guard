@@ -221,7 +221,7 @@ export default function PostureChart() {
 
       {tab === "chart" && (
         !anyData ? (
-          <p className="hint">아직 오늘 데이터가 없어요 — 카메라를 시작하면 자세 그래프가 여기 그려집니다.</p>
+          <p className="hint">아직 오늘 데이터가 없어요. 공부를 시작하면 자세 그래프가 여기 그려져요.</p>
         ) : (
           <div className="charts">
             <TrendBanner trend={d.trend} />
@@ -328,7 +328,7 @@ export default function PostureChart() {
                           activeDot={{ r: 5 }} isAnimationActive={false} />
                   </AreaChart>
                 </ResponsiveContainer>
-                <p className="hint">분당 15~20회가 정상이에요{d.blinkAvg != null ? ` · 오늘 평균 ${d.blinkAvg}회` : ""}. 낮으면 눈이 건조할 수 있어요 — 잠깐 먼 곳을 봐요.</p>
+                <p className="hint">분당 15~20회가 정상이에요{d.blinkAvg != null ? ` · 오늘 평균 ${d.blinkAvg}회` : ""}. 낮으면 눈이 건조할 수 있어요. 잠깐 먼 곳을 봐요.</p>
               </section>
             )}
           </div>

@@ -59,7 +59,7 @@ export default function StudyTimer() {
         <div className="sh-session">▶ 이번 세션 <b>{fmtClock(sessionSec)}</b></div>
       )}
       <div className="sh-chips">
-        <span className="sh-chip">바른자세 <b>{ratio != null ? ratio + "%" : "—"}</b></span>
+        <span className="sh-chip">바른자세 <b>{ratio != null ? ratio + "%" : "-"}</b></span>
         <span className="sh-chip">🔥 <b>{streak}일</b> 연속</span>
       </div>
     </section>

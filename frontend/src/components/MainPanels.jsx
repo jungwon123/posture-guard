@@ -16,21 +16,21 @@ export default function MainPanels() {
         <div id="start-cta">
           <div className="start-cta-desc">요정이 지켜보는 공부방, 시작할까요?</div>
           <button id="btn-start-hero" className="primary">📚 공부 시작</button>
-          <div className="start-cta-sub">카메라가 자세를 봐줘요 · 영상은 저장·전송되지 않아요</div>
+          <div className="start-cta-sub">영상은 저장되지 않고 자세만 살펴봐요</div>
         </div>
 
         {/* 바른자세 기준 등록 중 — 자세 안내 + 큰 카운트다운 */}
         <div id="calib-guide">
           <div className="calib-instr">평소 공부하는 자세로 앉아 주세요</div>
           <div className="calib-count" id="calib-count">5</div>
-          <div className="calib-sub">등·목만 곧게 — 이게 '내 공부 바른자세' 기준이 돼요</div>
+          <div className="calib-sub">등과 목만 곧게. 이게 '내 공부 바른자세' 기준이 돼요</div>
         </div>
 
         {/* 자리 비움 — 측정이 멈췄음을 분명히 안내 */}
         <div id="away-notice">
           <div className="away-emoji">⏸️</div>
           <div className="away-title">측정을 잠시 멈췄어요</div>
-          <div className="away-sub">자리를 비운 것 같아요 —<br />다시 앉으면 이어서 측정해요</div>
+          <div className="away-sub">자리를 비운 것 같아요.<br />다시 앉으면 이어서 측정해요</div>
         </div>
 
         {/* 범용 중앙 팝업 — 등록 완료·종료 안내 등 (app.js가 내용 채움) */}

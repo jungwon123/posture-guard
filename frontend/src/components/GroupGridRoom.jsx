@@ -137,7 +137,7 @@ function RoomInner({ onClose }) {
   return (
     <>
       {nudge && (
-        <div className="nudge-pop">🔔 <b>{nudge.from}</b> 님이 자세 펴라고 콕! 찔렀어요 — 허리 쫙! 🌟</div>
+        <div className="nudge-pop">🔔 <b>{nudge.from}</b> 님이 자세 펴라고 콕! 찔렀어요. 허리 쫙! 🌟</div>
       )}
       <ShareToggle />
       <p className="hint">공유를 켜면 친구들이 내 자세를 실시간으로 봐요. <b>자세 점수(숫자)는 카메라를 안 켜도</b> 서로 보여요. 영상은 LiveKit 서버를 통해 전달돼요.</p>
@@ -173,7 +173,7 @@ export default function GroupGridRoom({ code, onClose }) {
   if (conn === "unconfigured")
     return <p className="hint">실시간 그리드는 <b>LiveKit 설정</b> 후 켜져요 (관리자가 키를 등록해야 함). 지금은 준비 중이에요.</p>;
   if (conn === "error")
-    return <p className="hint rtc-err">연결 준비에 실패했어요 — 잠시 후 다시 시도해주세요.</p>;
+    return <p className="hint rtc-err">연결 준비에 실패했어요. 잠시 후 다시 시도해주세요.</p>;
   if (!conn) return <p className="hint">연결 중…</p>;
 
   return (

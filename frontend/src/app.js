@@ -374,7 +374,7 @@ function showSessionSummary() {
       <div class="cp-sub">카메라가 꺼졌습니다. 수고했어요!</div>`, 2600);
     return;
   }
-  const ratio = rep.ratio !== null ? `${Math.round(rep.ratio * 100)}%` : "—";
+  const ratio = rep.ratio !== null ? `${Math.round(rep.ratio * 100)}%` : "-";
   centerPop(`<div class="cp-title">오늘 측정을 종료했어요</div>
     <div class="cp-summary">
       <div class="cp-stat"><b>${(rep.good / 60).toFixed(0)}분</b><span>바른 자세</span></div>
@@ -474,7 +474,7 @@ function processBlink(now) {
     els.blink.textContent = `👁 ${blinkRate}회/분`;
     els.blinkStatus.textContent = `방금 측정: 분당 ${blinkRate}회 (정상 ${BLINK_NORMAL_LO}~${BLINK_NORMAL_HI})`;
     if (blinkRate < BLINK_LOW_RATE) {
-      notify(`👁 눈이 건조해질 수 있어요 — 잠깐 눈을 깜빡이거나 먼 곳을 봐요 (분당 ${blinkRate}회)`);
+      notify(`👁 눈이 건조해질 수 있어요. 잠깐 눈을 깜빡이거나 먼 곳을 봐요 (분당 ${blinkRate}회)`);
     }
   }
 }
@@ -556,7 +556,7 @@ function tick() {
       if (camSample) camCalibSamples.push(camSample);
       const remain = calibUntil - now;
       els.calibCount.textContent = String(Math.max(0, Math.ceil(remain))); // 큰 카운트다운(오버레이)
-      els.msg.textContent = `공부 바른자세 기준 등록 중… ${Math.max(0, remain).toFixed(1)}s — 평소 공부하는 자세로 등·목만 곧게`;
+      els.msg.textContent = `공부 바른자세 기준 등록 중… ${Math.max(0, remain).toFixed(1)}초. 평소 공부하는 자세로 등과 목만 곧게`;
       if (remain <= 0) {
         const wasRegistered = !!judge; // 재등록 여부 — 완료 문구 구분
         if (calibSamples.length >= 5) {
@@ -933,7 +933,7 @@ async function togglePip() {
     } else {
       await els.miniVideo.requestPictureInPicture();
     }
-    els.msg.textContent = "미니 모드 켜짐 — 작은 창이 모든 앱 위에 떠 있습니다.";
+    els.msg.textContent = "미니 모드 켜짐. 작은 창이 모든 앱 위에 떠 있습니다.";
   } catch (e) {
     els.msg.textContent = "미니 모드 실패: " + e.message;
   }
@@ -962,7 +962,7 @@ async function openDocPip() {
       };
       win.addEventListener("pagehide", () => { docPip = null; });
       updateDocPip(sm.state, null, nowSec());
-      els.msg.textContent = "미니 모드 켜짐 — 작은 창이 모든 앱 위에 떠 있습니다.";
+      els.msg.textContent = "미니 모드 켜짐. 작은 창이 모든 앱 위에 떠 있습니다.";
 }
 
 function updateDocPip(state, score, now) {
@@ -1208,7 +1208,7 @@ function statusOf(r) {
   return { cls: "active", dot: "good", label: "활동 중" };
 }
 function podCard(r, rank) {
-  if (!r) return `<div class="pod pod-${rank} empty"><div class="pod-rank">${rank}</div><div class="pod-name">—</div></div>`;
+  if (!r) return `<div class="pod pod-${rank} empty"><div class="pod-rank">${rank}</div><div class="pod-name">-</div></div>`;
   const me = r.member_id === memberId;
   const s = statusOf(r);
   return `<div class="pod pod-${rank}${me ? " me" : ""}">
@@ -1247,7 +1247,7 @@ function renderHofCards(rows, champions) {
   const topStreak = rows.filter((r) => (r.streak || 0) >= 2).sort((a, b) => b.streak - a.streak)[0];
   const leader = rows[0] && rows[0].good_sec > 0 ? rows[0] : null;
   const streakCard = topStreak
-    ? `<span class="hof-ic">🔥</span><span><b>${esc(topStreak.nickname)}</b> — ${topStreak.streak}일 연속 출석 중!</span>`
+    ? `<span class="hof-ic">🔥</span><span><b>${esc(topStreak.nickname)}</b> · ${topStreak.streak}일 연속 출석 중!</span>`
     : `<span class="hof-ic">🔥</span><span>연속 출석에 도전! 매일 켜면 <b>연속 배지</b>를 얻어요.</span>`;
   const crownCard = leader
     ? `<span class="hof-ic">👑</span><span>이번 주 1위 <b>${esc(leader.nickname)}</b> · ${(leader.good_sec / 60).toFixed(0)}분</span>`
@@ -1404,7 +1404,7 @@ els.btnCalib.onclick = () => {
 els.btnNotify.onclick = async () => {
   playNotes(MELODIES.sparkle.notes, rewards.settings.volume); // 사용자 제스처로 오디오 잠금 해제 (아이폰 필수 — 가장 먼저)
   if (typeof Notification === "undefined") {
-    els.msg.textContent = "이 브라우저(아이폰 등)는 배너 알림 미지원 — 화면 안 알림 + 소리로 대신해요. 무음 스위치를 꺼주세요.";
+    els.msg.textContent = "이 브라우저(아이폰 등)는 배너 알림 미지원. 화면 안 알림과 소리로 대신해요. 무음 스위치를 꺼주세요.";
     return;
   }
   const r = await Notification.requestPermission();
@@ -1517,7 +1517,7 @@ if (themeBtn) themeBtn.onclick = () =>
 // 그룹 그리드에서 친구가 "자세 콕!"을 보내면(LiveKit 데이터) 알림음·진동·요정 반응
 window.addEventListener("pg-nudge", (e) => {
   const from = e?.detail?.from || "친구";
-  notify(`🔔 ${from}님이 자세 교정하라고 콕! 찔렀어요 — 허리 펴요!`);
+  notify(`🔔 ${from}님이 자세 교정하라고 콕! 찔렀어요. 허리 펴요!`);
   speak("허리 펴라고 콕! 😤");
 });
 
