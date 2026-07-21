@@ -53,6 +53,18 @@ await pool.query(`
     token UUID,
     data JSONB NOT NULL DEFAULT '{}',
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now());
+  -- 일별 공부/자세 집계 (월별 캘린더) — 기기별 스냅샷을 필드별 GREATEST로 병합
+  CREATE TABLE IF NOT EXISTS daily_stats (
+    account_id UUID REFERENCES accounts(id) ON DELETE CASCADE,
+    date DATE NOT NULL,
+    watched_sec INT NOT NULL DEFAULT 0,
+    good_sec INT NOT NULL DEFAULT 0,
+    caution_sec INT NOT NULL DEFAULT 0,
+    bad_sec INT NOT NULL DEFAULT 0,
+    bad_count INT NOT NULL DEFAULT 0,
+    longest_good_sec INT NOT NULL DEFAULT 0,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (account_id, date));
 `);
 
 const app = express();
@@ -371,6 +383,53 @@ app.post("/api/sync-pull", async (req, res) => {
     "SELECT data, nickname, member_id FROM accounts WHERE token = $1", [token]);
   if (!r.rows.length) return bad(res, 401, "다시 로그인해주세요");
   return res.json({ ok: true, data: r.rows[0].data, nickname: r.rows[0].nickname, memberId: r.rows[0].member_id });
+});
+
+// ── 일별 공부/자세 집계 (월별 캘린더) ──
+const isDate = (s) => /^\d{4}-\d{2}-\d{2}$/.test(s || "");
+const DAY_SEC_MAX = 24 * 3600;
+const clampSec = (v) => Math.min(Math.max(0, Math.round(+v || 0)), DAY_SEC_MAX);
+
+// 업로드 — 최근 며칠 스냅샷을 upsert. 필드별 GREATEST 병합(늦게 온 옛 스냅샷이 최신 기록을 깎지 않게).
+app.post("/api/daily", async (req, res) => {
+  const token = (req.body?.token || "").trim();
+  if (!isUuid(token)) return bad(res, 401, "다시 로그인해주세요");
+  const a = await pool.query("SELECT id FROM accounts WHERE token = $1", [token]);
+  if (!a.rows.length) return bad(res, 401, "다시 로그인해주세요");
+  const days = Array.isArray(req.body?.days) ? req.body.days.slice(0, 40) : [];
+  for (const d of days) {
+    if (!isDate(d?.date)) continue;
+    await pool.query(
+      `INSERT INTO daily_stats (account_id, date, watched_sec, good_sec, caution_sec, bad_sec, bad_count, longest_good_sec)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       ON CONFLICT (account_id, date) DO UPDATE SET
+         watched_sec = GREATEST(daily_stats.watched_sec, EXCLUDED.watched_sec),
+         good_sec = GREATEST(daily_stats.good_sec, EXCLUDED.good_sec),
+         caution_sec = GREATEST(daily_stats.caution_sec, EXCLUDED.caution_sec),
+         bad_sec = GREATEST(daily_stats.bad_sec, EXCLUDED.bad_sec),
+         bad_count = GREATEST(daily_stats.bad_count, EXCLUDED.bad_count),
+         longest_good_sec = GREATEST(daily_stats.longest_good_sec, EXCLUDED.longest_good_sec),
+         updated_at = now()`,
+      [a.rows[0].id, d.date, clampSec(d.watched), clampSec(d.good), clampSec(d.caution),
+       clampSec(d.bad), Math.min(Math.max(0, Math.round(+d.badCount || 0)), 5000), clampSec(d.longestGood)]);
+  }
+  return res.json({ ok: true, saved: days.length });
+});
+
+// 월(범위) 조회 — 캘린더용. 최대 366일 범위.
+app.post("/api/daily-pull", async (req, res) => {
+  const token = (req.body?.token || "").trim();
+  const from = (req.body?.from || "").trim(), to = (req.body?.to || "").trim();
+  if (!isUuid(token)) return bad(res, 401, "다시 로그인해주세요");
+  if (!isDate(from) || !isDate(to)) return bad(res, 400, "날짜 형식은 YYYY-MM-DD");
+  if ((new Date(to) - new Date(from)) / 86400000 > 366) return bad(res, 400, "범위가 너무 넓어요");
+  const a = await pool.query("SELECT id FROM accounts WHERE token = $1", [token]);
+  if (!a.rows.length) return bad(res, 401, "다시 로그인해주세요");
+  const { rows } = await pool.query(
+    `SELECT to_char(date, 'YYYY-MM-DD') AS date, watched_sec, good_sec, caution_sec, bad_sec, bad_count, longest_good_sec
+     FROM daily_stats WHERE account_id = $1 AND date BETWEEN $2 AND $3 ORDER BY date`,
+    [a.rows[0].id, from, to]);
+  return res.json({ ok: true, days: rows });
 });
 
 const server = http.createServer(app);

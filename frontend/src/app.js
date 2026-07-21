@@ -8,7 +8,7 @@ import {
 import { AbsSmoother, extractAbsolute, finishAbsRef, absPenalty, absDominant, headPoseFromMatrix,
   extractGuidePoints, finishGuide, projectGuide } from "./posture3d.js";
 import { Rewards, MELODIES, SKINS, SHOP, TIERS, computeReport } from "./reward.js";
-import { getAuth, syncPull, mergeData, startSyncLoop } from "./sync.js";
+import { getAuth, syncPull, mergeData, startSyncLoop, writeDailySnapshot, pushDaily } from "./sync.js";
 
 // React 마운트 후 1회 실행 (엔진 계층 — 카메라 루프·판정·알림·PiP)
 let __started = false;
@@ -386,6 +386,7 @@ async function start() {
 
 // 카메라 끄기 — 웹캠 트랙을 정지해 카메라 불이 꺼지고 감지가 멈춘다.
 function stop() {
+  writeDailySnapshot(computeReport(events, dayStartSec(), nowSec())); // 오늘 일별 집계 스냅샷(캘린더)
   // 열린 GOOD/BAD 세그먼트를 지금 시점에 닫아, 정지 후에도 시간이 계속 누적되지 않게 함.
   if (running && (sm.state === "GOOD" || sm.state === "BAD")) { logTransition(sm.state, "AWAY", nowSec()); sm.state = "AWAY"; }
   running = false;
@@ -1559,6 +1560,9 @@ $("equip-grid")?.addEventListener("click", (e) => {
 
 // ── 초기화 ──
 initSettings();
+// 일별 집계 스냅샷 — 측정 중 1분 주기(캘린더 데이터, 이벤트 캡과 무관하게 보존)
+setInterval(() => { if (running) writeDailySnapshot(computeReport(events, dayStartSec(), nowSec())); }, 60_000);
+
 renderShop();
 renderSummary();
 

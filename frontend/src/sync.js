@@ -68,9 +68,17 @@ async function post(path, body) {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  if (!res.ok) {
+    const err = new Error(data.error || `HTTP ${res.status}`);
+    err.status = res.status;
+    throw err;
+  }
   return data;
 }
+
+// 동기화 401 = 토큰 무효(계정 삭제·토큰 교체 등) — 로그인 상태를 정리해 설정에서 재로그인을 유도.
+// 네트워크 오류(status 없음)는 로그아웃하지 않는다.
+const dropAuthIf401 = (e) => { if (e && e.status === 401) clearAuth(); };
 
 export async function apiRegister(nickname, password, memberId) {
   return post("register", { nickname, password, memberId });
@@ -85,7 +93,7 @@ export async function pushSync() {
   const auth = getAuth();
   if (!auth || pushing) return;
   pushing = true;
-  try { await post("sync", { token: auth.token, data: collectData() }); } catch {}
+  try { await post("sync", { token: auth.token, data: collectData() }); } catch (e) { dropAuthIf401(e); }
   finally { pushing = false; }
 }
 
@@ -94,7 +102,7 @@ export async function syncPull() {
   const auth = getAuth();
   if (!auth) return null;
   try { const r = await post("sync-pull", { token: auth.token }); return r.data ?? null; }
-  catch { return null; }
+  catch (e) { dropAuthIf401(e); return null; }
 }
 
 // 주기 업로드 시작 — 60초 주기 + 탭이 숨겨질 때 1회(앱 이탈 직전 백업). 최초 1회 즉시.
@@ -102,7 +110,71 @@ let loopStarted = false;
 export function startSyncLoop() {
   if (loopStarted || !getAuth()) return;
   loopStarted = true;
-  pushSync();
-  setInterval(pushSync, 60_000);
-  document.addEventListener("visibilitychange", () => { if (document.hidden) pushSync(); });
+  pushSync(); pushDaily();
+  setInterval(() => { pushSync(); pushDaily(); }, 60_000);
+  document.addEventListener("visibilitychange", () => { if (document.hidden) { pushSync(); pushDaily(); } });
+}
+
+// ── 일별 공부/자세 집계 (pg_daily = {"YYYY-MM-DD": {watched,good,caution,bad,badCount,longestGood}}) ──
+// 이벤트 로그(pg_events)는 최근 2000건 캡이라 오래된 날짜가 유실된다 — 일별 스냅샷으로 영구화.
+// 날짜 키는 로컬 기준(자정~오전엔 UTC 날짜가 전날로 밀리는 문제 방지).
+export const localDateStr = (d = new Date()) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+export function readDaily() { return jparse("pg_daily", {}); }
+
+const mergeDay = (cur, next) => ({
+  watched: Math.max(cur?.watched || 0, Math.round(next.watched || 0)),
+  good: Math.max(cur?.good || 0, Math.round(next.good || 0)),
+  caution: Math.max(cur?.caution || 0, Math.round(next.caution || 0)),
+  bad: Math.max(cur?.bad || 0, Math.round(next.bad || 0)),
+  badCount: Math.max(cur?.badCount || 0, next.badCount || 0),
+  longestGood: Math.max(cur?.longestGood || 0, Math.round(next.longestGood || 0)),
+});
+
+function saveDaily(all) {
+  const keys = Object.keys(all).sort(); // 400일 초과분 정리(스토리지 보호)
+  keys.slice(0, Math.max(0, keys.length - 400)).forEach((k) => delete all[k]);
+  localStorage.setItem("pg_daily", JSON.stringify(all));
+}
+
+// 오늘 스냅샷 기록 — 엔진이 1분 주기·측정 종료 시 호출. 필드별 max(하루 안에서 단조 증가).
+export function writeDailySnapshot(rep) {
+  if (!rep || !(rep.watched > 0)) return;
+  const all = readDaily();
+  const key = localDateStr();
+  const caution = Math.max(0, rep.watched - rep.good - rep.bad);
+  all[key] = mergeDay(all[key], { ...rep, caution });
+  saveDaily(all);
+}
+
+// 최근 14일 업로드 — 로그인 상태일 때만. 서버도 GREATEST 병합이라 중복 전송 안전.
+let pushingDaily = false;
+export async function pushDaily() {
+  const auth = getAuth();
+  if (!auth || pushingDaily) return;
+  const all = readDaily();
+  const keys = Object.keys(all).sort().slice(-14);
+  if (!keys.length) return;
+  pushingDaily = true;
+  try { await post("daily", { token: auth.token, days: keys.map((d) => ({ date: d, ...all[d] })) }); }
+  catch (e) { dropAuthIf401(e); } finally { pushingDaily = false; }
+}
+
+// 범위 내려받기(캘린더 월 이동 시) — 서버 기록을 로컬 pg_daily에 max 병합 후 전체 반환.
+export async function pullDailyRange(from, to) {
+  const auth = getAuth();
+  const all = readDaily();
+  if (!auth) return all;
+  try {
+    const r = await post("daily-pull", { token: auth.token, from, to });
+    for (const row of r.days || []) {
+      all[row.date] = mergeDay(all[row.date], {
+        watched: row.watched_sec, good: row.good_sec, caution: row.caution_sec,
+        bad: row.bad_sec, badCount: row.bad_count, longestGood: row.longest_good_sec,
+      });
+    }
+    saveDaily(all);
+  } catch (e) { dropAuthIf401(e); }
+  return all;
 }

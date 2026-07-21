@@ -808,3 +808,30 @@
   100% { opacity: 0; transform: scale(.35) translateY(-12px) rotate(80deg); }
 }
 @media (prefers-reduced-motion: reduce) { .buddy-spark { display: none; } }
+
+/* ── 월별 공부 캘린더 (통계 시트) ── */
+.cal-card { padding-top: 12px; }
+.cal-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.cal-title { flex: 1; text-align: center; font-size: 15px; font-weight: 800; letter-spacing: -.02em;
+  display: flex; flex-direction: column; gap: 2px; }
+.cal-total { font-size: 11.5px; font-weight: 600; color: var(--dim); }
+.cal-nav { width: 34px; height: 34px; padding: 0; border-radius: 8px; font-size: 18px; line-height: 1; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cal-week { margin-bottom: 4px; }
+.cal-wd { text-align: center; font-size: 11px; font-weight: 700; color: var(--dim); }
+.cal-wd:first-child { color: #d98484; }
+.cal-day { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  aspect-ratio: 1; padding: 0; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--panel); font-variant-numeric: tabular-nums; }
+.cal-day:disabled { opacity: .35; }
+.cal-day.today { border-color: var(--accent); }
+.cal-day.sel { box-shadow: 0 0 0 2px var(--accent); border-color: var(--accent); }
+.cal-num { font-size: 12.5px; font-weight: 700; }
+.cal-min { font-size: 9.5px; font-weight: 600; color: var(--dim); min-height: 12px; }
+.cal-day[style] .cal-min { color: color-mix(in srgb, var(--text) 80%, transparent); }
+.cal-detail { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
+.cal-detail-title { font-size: 13px; font-weight: 800; margin-bottom: 6px; font-variant-numeric: tabular-nums; }
+.cal-rows { display: flex; flex-direction: column; gap: 5px; }
+.cal-row { display: flex; justify-content: space-between; font-size: 13px; }
+.cal-row span { color: var(--dim); }
+.cal-row b { font-variant-numeric: tabular-nums; }

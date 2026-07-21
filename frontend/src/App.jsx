@@ -6,6 +6,7 @@ import TogetherCta from "./components/TogetherCta.jsx";
 import Controls from "./components/Controls.jsx";
 import AttendanceCard from "./components/AttendanceCard.jsx";
 import PostureChart from "./components/PostureChart.jsx";
+import CalendarCard from "./components/CalendarCard.jsx";
 import SettingsPanel from "./components/SettingsPanel.jsx";
 import EyeCarePanel from "./components/EyeCarePanel.jsx";
 import GroupPanel from "./components/GroupPanel.jsx";
@@ -97,6 +98,7 @@ export default function App() {
             <button className="stats-close" onClick={() => setShowStats(false)} aria-label="닫기">✕</button>
           </div>
           <PostureChart />
+          <CalendarCard />
         </div>
       </div>
 
