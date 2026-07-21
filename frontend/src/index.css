@@ -107,6 +107,13 @@
     50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 0%, transparent); } }
   @media (prefers-reduced-motion: reduce) { button.pulse { animation: none; } }
   #msg { padding: 4px 16px 12px; color: var(--dim); font-size: 13px; min-height: 20px; }
+  /* 주요 액션 버튼 테두리 — 숲 컨셉 덩굴 프레임(카드 프레임과 같은 배경 레이어 방식, 라운드 유지) */
+  #btn-start, #btn-calib {
+    background: url("/assets/ui/btn-frame.png") center / 100% 100% no-repeat, var(--panel);
+    border-color: transparent; padding: 9px 16px;
+  }
+  #btn-start.primary { background: url("/assets/ui/btn-frame.png") center / 100% 100% no-repeat, var(--accent); }
+  #btn-start.danger { background: url("/assets/ui/btn-frame.png") center / 100% 100% no-repeat, var(--bad); }
 
   /* ── 카메라 패널 오버레이 (시작 CTA·등록 카운트다운·자리비움·중앙 팝업) ── */
   #start-cta, #calib-guide, #away-notice, #cam-retry {
@@ -118,7 +125,9 @@
   .start-cta-desc { color: var(--text); font-size: 17px; font-weight: 700; letter-spacing: -.02em; }
   #btn-start-hero { font-size: 17px; font-weight: 800; padding: 13px 26px; border-radius: 12px;
     box-shadow: 0 6px 18px rgba(12, 16, 24,.25);
-    display: inline-flex; align-items: center; gap: 8px; }
+    display: inline-flex; align-items: center; gap: 8px;
+    background: url("/assets/ui/btn-frame.png") center / 100% 100% no-repeat, var(--accent);
+    border-color: transparent; }
   #btn-start-hero::before { content: ""; width: 22px; height: 15px; flex: none;
     background: url("/assets/ui/ui-sprout.png") center / contain no-repeat; }
   .start-cta-sub { color: var(--dim); font-size: 12px; }
@@ -424,7 +433,8 @@
 .login-pillars b { font-size: 20px; }
 /* 프라이머리 버튼 (솔리드, 라운드) */
 .login-primary {
-  width: 100%; background: var(--accent); color: #101418;
+  width: 100%; color: #101418;
+  background: url("/assets/ui/btn-frame.png") center / 100% 100% no-repeat, var(--accent);
   font-size: 16px; font-weight: 800; border: none; border-radius: 14px; padding: 14px;
   box-shadow: 0 10px 24px rgba(12, 16, 24,.30);
   transition: transform .1s ease, filter .15s ease;
