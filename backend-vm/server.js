@@ -53,6 +53,7 @@ await pool.query(`
     token UUID,
     data JSONB NOT NULL DEFAULT '{}',
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now());
+  CREATE INDEX IF NOT EXISTS accounts_token_idx ON accounts (token); -- 동기화 인증 조회 경로
   -- 일별 공부/자세 집계 (월별 캘린더) — 기기별 스냅샷을 필드별 GREATEST로 병합
   CREATE TABLE IF NOT EXISTS daily_stats (
     account_id UUID REFERENCES accounts(id) ON DELETE CASCADE,
@@ -83,7 +84,14 @@ app.use(cors({
     cb(null, CORS_ALLOW.some((re) => re.test(origin)));
   },
 }));
-app.use("/api/", rateLimit({ windowMs: 60_000, max: 120, standardHeaders: true, legacyHeaders: false }));
+// rate limit — 학교 와이파이는 반 전체가 공인 IP 하나를 공유하므로 IP 키만 쓰면 시연 때 합산돼 막힌다.
+// 요청에 memberId/token이 있으면 그 단위로, 없으면 IP로 제한.
+app.use("/api/", rateLimit({
+  windowMs: 60_000, max: 120, standardHeaders: true, legacyHeaders: false,
+  validate: { keyGeneratorIpFallback: false },
+  keyGenerator: (req) =>
+    req.body?.memberId || req.body?.token || req.query?.memberId || req.ip,
+}));
 const createLimiter = rateLimit({ windowMs: 3600_000, max: 10, standardHeaders: true, legacyHeaders: false,
   message: { error: "그룹 생성이 너무 잦아요 — 잠시 후 다시 시도해주세요" } });
 
@@ -396,12 +404,20 @@ app.post("/api/daily", async (req, res) => {
   if (!isUuid(token)) return bad(res, 401, "다시 로그인해주세요");
   const a = await pool.query("SELECT id FROM accounts WHERE token = $1", [token]);
   if (!a.rows.length) return bad(res, 401, "다시 로그인해주세요");
-  const days = Array.isArray(req.body?.days) ? req.body.days.slice(0, 40) : [];
-  for (const d of days) {
-    if (!isDate(d?.date)) continue;
+  const days = (Array.isArray(req.body?.days) ? req.body.days.slice(0, 40) : [])
+    .filter((d) => isDate(d?.date));
+  if (days.length) {
+    // 루프 INSERT(요청당 최대 40쿼리) 대신 multi-row upsert 한 방
+    const params = [a.rows[0].id];
+    const rows = days.map((d) => {
+      const base = params.length;
+      params.push(d.date, clampSec(d.watched), clampSec(d.good), clampSec(d.caution),
+        clampSec(d.bad), Math.min(Math.max(0, Math.round(+d.badCount || 0)), 5000), clampSec(d.longestGood));
+      return `($1, $${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7})`;
+    });
     await pool.query(
       `INSERT INTO daily_stats (account_id, date, watched_sec, good_sec, caution_sec, bad_sec, bad_count, longest_good_sec)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       VALUES ${rows.join(", ")}
        ON CONFLICT (account_id, date) DO UPDATE SET
          watched_sec = GREATEST(daily_stats.watched_sec, EXCLUDED.watched_sec),
          good_sec = GREATEST(daily_stats.good_sec, EXCLUDED.good_sec),
@@ -409,9 +425,7 @@ app.post("/api/daily", async (req, res) => {
          bad_sec = GREATEST(daily_stats.bad_sec, EXCLUDED.bad_sec),
          bad_count = GREATEST(daily_stats.bad_count, EXCLUDED.bad_count),
          longest_good_sec = GREATEST(daily_stats.longest_good_sec, EXCLUDED.longest_good_sec),
-         updated_at = now()`,
-      [a.rows[0].id, d.date, clampSec(d.watched), clampSec(d.good), clampSec(d.caution),
-       clampSec(d.bad), Math.min(Math.max(0, Math.round(+d.badCount || 0)), 5000), clampSec(d.longestGood)]);
+         updated_at = now()`, params);
   }
   return res.json({ ok: true, saved: days.length });
 });
