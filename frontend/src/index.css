@@ -160,8 +160,9 @@
   #fab-stats {
     position: fixed; right: 14px; bottom: 74px; z-index: 45;
     background: var(--accent); color: #101418; border: none; font-weight: 800; font-size: 13px;
-    padding: 10px 16px; border-radius: 999px; box-shadow: 0 6px 18px rgba(12, 16, 24, .45);
+    padding: 10px 18px; border-radius: 999px; box-shadow: 0 6px 18px rgba(12, 16, 24, .45);
     display: inline-flex; align-items: center; gap: 6px;
+    background: url("/assets/ui/btn-frame-pill.png") center / 100% 100% no-repeat, var(--accent);
   }
   #fab-stats::before { content: ""; width: 18px; height: 14px; flex: none;
     background: url("/assets/ui/ui-leaf-chart.png") center / contain no-repeat; }
@@ -859,3 +860,40 @@
 .cal-row { display: flex; justify-content: space-between; font-size: 13px; }
 .cal-row span { color: var(--dim); }
 .cal-row b { font-variant-numeric: tabular-nums; }
+
+/* ── 숲 컨셉 디자인 에셋 시스템 — 버튼/컴포넌트 공통 (btn-frame·wide·pill, ui-divider, ui-corner-leaf) ── */
+/* 표준 사각 액션 버튼: 덩굴 프레임 */
+#btn-notify, #btn-pip, #btn-face, #btn-report, #btn-test, #btn-cam-retry,
+#btn-group-join, .rtc-view, .login-form button[type="submit"],
+.card > button, .card .row button {
+  background: url("/assets/ui/btn-frame.png") center / 100% 100% no-repeat, var(--panel);
+  border-color: transparent;
+}
+#btn-group-create { background: url("/assets/ui/btn-frame.png") center / 100% 100% no-repeat, var(--accent); border-color: transparent; }
+/* 넓은 행 버튼: 와이드 프레임 */
+.together-cta { background: url("/assets/ui/btn-frame-wide.png") center / 100% 100% no-repeat, var(--panel) !important; border-color: transparent !important; }
+.gl-room { background: url("/assets/ui/btn-frame-wide.png") center / 100% 100% no-repeat, var(--panel); border-color: transparent; }
+.gl-room:hover { border-color: transparent; filter: brightness(1.1); }
+.gl-room.active { box-shadow: 0 0 0 2px var(--accent); }
+/* 페이지 타이틀: 새싹 글리프 */
+.page-title { display: flex; align-items: center; gap: 8px; }
+.page-title::before { content: ""; width: 20px; height: 13px; flex: none;
+  background: url("/assets/ui/ui-sprout.png") center / contain no-repeat; }
+/* 카드: 우상단 잎 장식 (상단에 조작 요소가 있는 카드는 제외) */
+.card { position: relative; }
+.card:not(.dressup-head):not(.cal-card):not(.chart-card):not(.account-card)::after {
+  content: ""; position: absolute; top: 8px; right: 10px; width: 52px; height: 48px;
+  background: url("/assets/ui/ui-corner-leaf.png") center / contain no-repeat;
+  transform: scaleX(-1); opacity: .14; pointer-events: none;
+}
+/* 하단 내비: 덩굴 디바이더 */
+#bottom-nav::before { content: ""; position: absolute; top: -8px; left: 50%; transform: translateX(-50%);
+  width: min(430px, 96%); height: 16px; background: url("/assets/ui/ui-divider.png") center / contain no-repeat; pointer-events: none; }
+#bottom-nav { position: fixed; }
+/* 통계 시트 헤더: 디바이더 */
+.stats-head { border-bottom: none; }
+.stats-head::after { content: ""; position: absolute; left: 50%; bottom: -2px; transform: translateX(-50%);
+  width: 72%; height: 12px; background: url("/assets/ui/ui-divider.png") center / contain no-repeat; pointer-events: none; }
+
+/* 계정 카드 버튼: accent 유지 + 프레임 */
+.account-card > button { background: url("/assets/ui/btn-frame.png") center / 100% 100% no-repeat, var(--accent); }
