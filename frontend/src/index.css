@@ -160,7 +160,7 @@
   #fab-stats {
     position: fixed; right: 14px; bottom: 74px; z-index: 45;
     background: var(--accent); color: #101418; border: none; font-weight: 800; font-size: 13px;
-    padding: 10px 18px; border-radius: 999px; box-shadow: 0 6px 18px rgba(12, 16, 24, .45);
+    padding: 12px 24px; border-radius: 999px; box-shadow: 0 6px 18px rgba(12, 16, 24, .45);
     display: inline-flex; align-items: center; gap: 6px;
     background: url("/assets/ui/btn-frame-pill.png") center / 100% 100% no-repeat, var(--accent);
   }
@@ -870,9 +870,15 @@
   border-color: transparent;
 }
 #btn-group-create { background: url("/assets/ui/btn-frame.png") center / 100% 100% no-repeat, var(--accent); border-color: transparent; }
+/* 프레임 안쪽 콘텐츠 여백 — 줄기 두께에 맞춰 패딩 보정 */
+#btn-notify, #btn-pip, #btn-face, #btn-report, #btn-test, #btn-cam-retry,
+#btn-group-join, .rtc-view, .login-form button[type="submit"],
+.card > button, .card .row button, #btn-group-create, .account-card > button {
+  padding: 9px 18px;
+}
 /* 넓은 행 버튼: 와이드 프레임 */
-.together-cta { background: url("/assets/ui/btn-frame-wide.png") center / 100% 100% no-repeat, var(--panel) !important; border-color: transparent !important; }
-.gl-room { background: url("/assets/ui/btn-frame-wide.png") center / 100% 100% no-repeat, var(--panel); border-color: transparent; }
+.together-cta { background: url("/assets/ui/btn-frame-wide.png") center / 100% 100% no-repeat, var(--panel) !important; border-color: transparent !important; padding: 15px 22px !important; }
+.gl-room { background: url("/assets/ui/btn-frame-wide.png") center / 100% 100% no-repeat, var(--panel); border-color: transparent; padding: 13px 20px; }
 .gl-room:hover { border-color: transparent; filter: brightness(1.1); }
 .gl-room.active { box-shadow: 0 0 0 2px var(--accent); }
 /* 페이지 타이틀: 새싹 글리프 */
