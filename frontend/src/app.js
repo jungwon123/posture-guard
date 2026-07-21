@@ -1603,6 +1603,14 @@ if (getAuth()) {
   }).finally(() => startSyncLoop()); // 병합이 끝난 뒤에 업로드 시작(옛 로컬로 서버를 덮지 않게)
 }
 
+// 셀프호스트 LiveKit A/B 토글 — 폰에서 주소창에 ?lkself=1 (켬) / ?lkself=0 (끔)만 붙이면 됨.
+// 플래그는 기기에 남고, 그리드 접속 시 rtc-token에 self로 전달된다(기본=Cloud).
+{
+  const lk = new URLSearchParams(location.search).get("lkself");
+  if (lk === "1") localStorage.setItem("pg_lk_self", "1");
+  else if (lk === "0") localStorage.removeItem("pg_lk_self");
+}
+
 // 전방머리(headForward) 실기기 검증 오버레이 — URL 에 ?fwd=1 일 때만. 학생 화면엔 안 뜬다.
 // 사용법: 바른자세 기준 등록(캘리브) 후, 정자세 vs 거북목에서 Δ(현재-기준)가 유의미하게 갈리는지 관찰.
 if (new URLSearchParams(location.search).has("fwd")) {

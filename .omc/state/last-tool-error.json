@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"git diff frontend/src/app.js | head -120 && echo ===== && cat frontend/src/sync.js\",\"description\":\"Review camera resume diff and sync.js\"}",
-  "error": "Exit code 1\ndiff --git a/frontend/src/app.js b/frontend/src/app.js\nindex e4368eb..ba951c0 100644\n--- a/frontend/src/app.js\n+++ b/frontend/src/app.js\n@@ -8,6 +8,7 @@ import {\n import { AbsSmoother, extractAbsolute, finishAbsRef, absPenalty, absDominant, headPoseFromMatrix,\n   extractGuidePoints, finishGuide, projectGuide } from \"./posture3d.js\";\n import { Rewards, MELODIES, SKINS, SHOP, TIERS, computeReport } from \"./reward.js\";\n+import { getAuth, syncPull, mergeData, startSyncLoop } from \"./sync...",
-  "timestamp": "2026-07-21T03:29:27.006Z",
+  "tool_input_preview": "{\"command\":\"cd /private/tmp/claude-501/-Users-jwon-zanchi123/d8daac5f-58e7-4eef-9a14-2100edd17c1f/scratchpad && node - <<'JS'\\nconst API = \\\"https://34-64-158-222.sslip.io\\\";\\nconst memberId = crypto....",
+  "error": "Exit code 1\ngroup: PZBLAA\ncloud url: undefined | selfHosted: undefined\nself  url: undefined | selfHosted: undefined\nFAIL: TypeError: Invalid URL",
+  "timestamp": "2026-07-21T18:57:48.285Z",
   "retry_count": 1
 }

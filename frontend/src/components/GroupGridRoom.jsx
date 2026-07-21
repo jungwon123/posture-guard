@@ -154,9 +154,10 @@ export default function GroupGridRoom({ code, onClose }) {
     let alive = true;
     (async () => {
       try {
+        // pg_lk_self=1 이면 VM에 직접 띄운 셀프호스트 LiveKit로 접속(실험용 A/B) — 기본은 Cloud
         const r = await fetch(`${API_BASE}/api/rtc-token`, {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ memberId: myId(), code }),
+          body: JSON.stringify({ memberId: myId(), code, self: localStorage.getItem("pg_lk_self") === "1" }),
         });
         const d = await r.json().catch(() => ({}));
         if (!alive) return;

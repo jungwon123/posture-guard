@@ -299,24 +299,29 @@ app.get("/api/leaderboard", async (req, res) => {
 });
 
 // LiveKit(반전체 그리드) 참가 토큰 — 같은 그룹 멤버만. 키 미설정 시 503으로 대기.
+// self=true 옵트인: VM에 직접 띄운 셀프호스트 LiveKit(LIVEKIT_SELF_*)로 발급 —
+// 기본은 Cloud 그대로라 시연 리스크 없음. 클라이언트는 pg_lk_self 플래그로 A/B 전환.
 app.post("/api/rtc-token", async (req, res) => {
   const memberId = (req.body?.memberId || "").trim();
   const code = (req.body?.code || "").trim().toUpperCase();
   if (!isUuid(memberId)) return bad(res, 400, "잘못된 기기 ID");
   if (!/^[A-Z2-9]{6}$/.test(code)) return bad(res, 400, "코드는 6자리예요");
-  const { LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET } = process.env;
-  if (!LIVEKIT_URL || !LIVEKIT_API_KEY || !LIVEKIT_API_SECRET)
+  const useSelf = req.body?.self === true;
+  const url = useSelf ? process.env.LIVEKIT_SELF_URL : process.env.LIVEKIT_URL;
+  const apiKey = useSelf ? process.env.LIVEKIT_SELF_KEY : process.env.LIVEKIT_API_KEY;
+  const apiSecret = useSelf ? process.env.LIVEKIT_SELF_SECRET : process.env.LIVEKIT_API_SECRET;
+  if (!url || !apiKey || !apiSecret)
     return res.status(503).json({ error: "LiveKit 미설정 (관리자 키 필요)", configured: false });
   const q = await pool.query(
     `SELECT ms.nickname FROM memberships ms JOIN groups g ON g.id = ms.group_id
      WHERE ms.member_id = $1 AND g.code = $2`,
     [memberId, code]);
   if (!q.rows.length) return bad(res, 404, "그룹 멤버만 가능해요");
-  const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET,
+  const at = new AccessToken(apiKey, apiSecret,
     { identity: memberId, name: q.rows[0].nickname, ttl: "2h" });
   at.addGrant({ roomJoin: true, room: `pg-${code}`, canPublish: true, canSubscribe: true, canPublishData: true });
   const token = await at.toJwt(); // v2: async
-  return res.json({ token, url: LIVEKIT_URL, room: `pg-${code}`, configured: true });
+  return res.json({ token, url, room: `pg-${code}`, configured: true, selfHosted: useSelf });
 });
 
 // ── 계정 + 데이터 동기화 ──────────────────────────────────────────────
