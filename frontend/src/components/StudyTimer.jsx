@@ -32,6 +32,16 @@ export default function StudyTimer() {
 
   let events = [];
   try { events = JSON.parse(localStorage.getItem("pg_events") || "[]"); } catch {}
+
+  // 숫자가 바뀌는 자리만 굴러 올라오는 롤링 디지트 — key에 값을 넣어 변경 시 리마운트→CSS 애니 재생
+  const RollingClock = ({ text }) => (
+    <span className="sh-clock">
+      {text.split("").map((ch, i) =>
+        /\d/.test(ch)
+          ? <span key={`${i}-${ch}`} className="sh-digit">{ch}</span>
+          : <span key={`s${i}`} className="sh-sep">{ch}</span>)}
+    </span>
+  );
   const rep = computeReport(events, dayStartSec(), nowSec());
   const live = (typeof window !== "undefined" && window.__pgLive) || {};
   // 이번 세션 공부시간 = 세션 시작 이후 watched(자리 지키며 공부). 종료하면 사라짐.
@@ -54,9 +64,9 @@ export default function StudyTimer() {
           <i className="sh-dot" />{status.text}
         </span>
       </div>
-      <div className="sh-time">{fmtClock(rep.watched)}</div>
+      <div className="sh-time"><RollingClock text={fmtClock(rep.watched)} /></div>
       {sessionSec != null && (
-        <div className="sh-session">▶ 이번 세션 <b>{fmtClock(sessionSec)}</b></div>
+        <div className="sh-session">▶ 이번 세션 <b><RollingClock text={fmtClock(sessionSec)} /></b></div>
       )}
       <div className="sh-chips">
         <span className="sh-chip">바른자세 <b>{ratio != null ? ratio + "%" : "-"}</b></span>

@@ -344,9 +344,32 @@ function renderSummary() {
     (rep.ratio !== null ? ` · ${Math.round(rep.ratio * 100)}%` : "");
 }
 
+// ── 마이크로 인터랙션: 파티클 버스트 — 이벤트성 1회 재생만 (포인트 적립·구매 축하).
+// 상시 파티클/캔버스 이펙트는 카메라 판정 루프와 경합하므로 금지. reduced-motion이면 전부 생략.
+const REDUCED_MOTION = matchMedia("(prefers-reduced-motion: reduce)").matches;
+function burstXY(x, y, { n = 10, colors = ["#f5c542", "#e8b83a", "#8fd08f"] } = {}) {
+  if (REDUCED_MOTION) return;
+  for (let i = 0; i < n; i++) {
+    const p = document.createElement("i");
+    p.className = "burst-p";
+    const a = (Math.PI * 2 * i) / n + Math.random() * 0.6;
+    const d = 32 + Math.random() * 42;
+    p.style.cssText = `left:${x}px;top:${y}px;background:${colors[i % colors.length]};` +
+      `--dx:${(Math.cos(a) * d).toFixed(1)}px;--dy:${(Math.sin(a) * d).toFixed(1)}px`;
+    document.body.appendChild(p);
+    p.addEventListener("animationend", () => p.remove());
+  }
+}
+function burstAt(el, opts) {
+  if (!el) return;
+  const r = el.getBoundingClientRect();
+  if (r.width || r.height) burstXY(r.left + r.width / 2, r.top + r.height / 2, opts);
+}
+
 function flashPoints() {
   els.points.classList.add("flash");
   setTimeout(() => els.points.classList.remove("flash"), 300);
+  burstAt(els.points); // 적립 순간 금화 버스트
 }
 
 // ── 카메라 + MediaPipe ──
@@ -1206,18 +1229,45 @@ function initSettings() {
 }
 
 // ── 상점 UI ──
-function buyItem(item) {
+function buyItem(item, btn) {
+  // 구매 축하 버스트 좌표는 re-render 전에 확보 (renderShop이 카드를 갈아끼움)
+  const rect = btn?.getBoundingClientRect();
   const r = rewards.buy(item.id);
   els.msg.textContent = r.msg;
   if (r.ok) {
     renderShop(); flashPoints();
+    if (rect) burstXY(rect.left + rect.width / 2, rect.top + rect.height / 2,
+      { n: 14, colors: ["#f5c542", "#8fd08f", "#f2c4cf"] }); // 금화+새싹+꽃잎
     rewardUntil = nowSec() + 2.5; // "보상 받았어요!" 모션
     updateFairyVisual(sm.state, false, nowSec(), rewards.fairy(sm.state, 0, false));
   }
   els.points.textContent = `${rewards.points}P`;
 }
 
+// 스킨 카드 터치 틸트 — 포인터 위치 따라 살짝 기울기 (컨테이너에 1회 위임 부착)
+function initCardTilt(container) {
+  if (REDUCED_MOTION || !container || container._tilt) return;
+  container._tilt = true;
+  const reset = (c) => { if (c) c.style.transform = ""; };
+  container.addEventListener("pointermove", (e) => {
+    const c = e.target.closest(".skin-card");
+    if (!c || !c.contains(e.target)) return;
+    const r = c.getBoundingClientRect();
+    if (!r.width || !r.height) return; // 숨김 상태(세그먼트 접힘) 방어
+    const px = (e.clientX - r.left) / r.width - 0.5;
+    const py = (e.clientY - r.top) / r.height - 0.5;
+    c.style.transform = `perspective(520px) rotateY(${(px * 7).toFixed(2)}deg) rotateX(${(-py * 7).toFixed(2)}deg)`;
+  });
+  container.addEventListener("pointerout", (e) => {
+    const c = e.target.closest?.(".skin-card");
+    if (c && !c.contains(e.relatedTarget)) reset(c);
+  });
+  container.addEventListener("pointerup", (e) => reset(e.target.closest?.(".skin-card")));
+  container.addEventListener("pointercancel", (e) => reset(e.target.closest?.(".skin-card")));
+}
+
 function renderShop() {
+  initCardTilt(els.shopList);
   els.shopList.innerHTML = "";
   // 등급별 스킨 (레어/에픽/프리미엄)
   for (const tier of TIERS) {
@@ -1240,7 +1290,7 @@ function renderShop() {
         : owned ? `<span class="owned-tag">✓ 보유</span>`
         : `<button class="buy-btn">Ⓟ ${item.price.toLocaleString()}</button>`;
       card.innerHTML = `${thumb}<div class="skin-name">${item.label}</div><div class="skin-action">${action}</div>`;
-      if (!item.soon && !owned) card.querySelector(".buy-btn").onclick = () => buyItem(item);
+      if (!item.soon && !owned) card.querySelector(".buy-btn").onclick = (e) => buyItem(item, e.currentTarget);
       grid.appendChild(card);
     }
     sec.appendChild(grid);
@@ -1394,8 +1444,11 @@ function renderHallOfFame(rows, champions = []) {
       <span class="hof-status ${s.cls}"><span class="dot ${s.dot}"></span>${s.label}</span>
     </div>`;
   }).join("");
+  // 타이틀 글자별 은은한 웨이브 (reduced-motion이면 CSS에서 정지)
+  const waveTitle = "명예의 전당".split("")
+    .map((ch, i) => `<span style="--i:${i}">${ch === " " ? "&nbsp;" : ch}</span>`).join("");
   return `<div class="hof">
-    <div class="hof-head"><div class="hof-title">명예의 전당</div>
+    <div class="hof-head"><div class="hof-title">${waveTitle}</div>
       <div class="hof-sub">바른 자세로 빛나는 우리의 기록!</div></div>
     ${podium}
     <div class="hof-legend"><span><span class="dot good"></span>활동 중</span>

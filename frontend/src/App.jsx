@@ -15,6 +15,14 @@ import GroupGrid from "./components/GroupGrid.jsx";
 import DressUpPage from "./components/DressUpPage.jsx";
 import LoginPage from "./components/LoginPage.jsx";
 import OnboardingNickname from "./components/OnboardingNickname.jsx";
+
+// 시작 화면 숲 배경에 손끝을 따라오는 은은한 빛 — CSS 변수만 갱신(상시 애니메이션 아님)
+const moveGateLight = (e) => {
+  const t = e.currentTarget;
+  const r = t.getBoundingClientRect();
+  t.style.setProperty("--lx", `${e.clientX - r.left}px`);
+  t.style.setProperty("--ly", `${e.clientY - r.top}px`);
+};
 import OnboardingTour from "./components/OnboardingTour.jsx";
 import ReportOverlay from "./components/ReportOverlay.jsx";
 import InstallBanner from "./components/InstallBanner.jsx";
@@ -122,11 +130,11 @@ export default function App() {
           기존 사용자는 pg_auth에 needsNickname이 없어(undefined=falsy) 온보딩을 건너뛴다.
           뒤에서 앱은 이미 마운트돼 엔진이 돈다. */}
       {!auth ? (
-        <div className="login-gate">
+        <div className="login-gate" onPointerMove={moveGateLight}>
           <LoginPage />
         </div>
       ) : auth.needsNickname ? (
-        <div className="login-gate">
+        <div className="login-gate" onPointerMove={moveGateLight}>
           <OnboardingNickname />
         </div>
       ) : null}

@@ -461,6 +461,52 @@
 }
 .onboard-next:active { transform: scale(.98); }
 
+/* ── 마이크로 인터랙션 (이벤트성·경량 — 상시 캔버스/파티클 금지, reduced-motion 존중) ── */
+/* 파티클 버스트: 포인트 적립·스킨 구매 순간에만 생성됐다 애니 끝나면 제거 */
+.burst-p {
+  position: fixed; width: 7px; height: 7px; border-radius: 50%;
+  pointer-events: none; z-index: 98; transform: translate(-50%, -50%);
+  animation: burst-fly .65s cubic-bezier(.2, .7, .3, 1) forwards;
+}
+@keyframes burst-fly {
+  from { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  to { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(.25); opacity: 0; }
+}
+/* 공부 타이머 롤링 디지트 — 바뀐 숫자만 굴러 올라옴 (tabular-nums로 폭 고정) */
+.sh-time, .sh-session b { font-variant-numeric: tabular-nums; }
+.sh-digit, .sh-sep { display: inline-block; }
+.sh-digit { animation: digit-in .28s ease; }
+@keyframes digit-in { from { transform: translateY(.35em); opacity: 0; } }
+/* 오늘 출석 도장 — 쿵 찍히는 임팩트 */
+.att-stamp-img.stamp-pop { animation: stamp-in .5s cubic-bezier(.2, 1.4, .4, 1); }
+@keyframes stamp-in {
+  0% { transform: scale(1.9) rotate(-10deg); opacity: 0; }
+  55% { transform: scale(.92) rotate(2deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0); }
+}
+/* 스킨 카드 터치 틸트 (transform은 JS가 포인터 위치로 갱신) */
+.skin-card { transition: transform .18s ease; will-change: transform; }
+/* 명예의 전당 타이틀 — 글자별 은은한 웨이브 (±2px, 저속) */
+.hof-title span {
+  display: inline-block;
+  animation: hof-wave 2.8s ease-in-out calc(var(--i, 0) * .13s) infinite;
+}
+@keyframes hof-wave { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
+/* 시작 화면 — 손끝 따라오는 요정빛 (카드 아래·스크림 위 레이어) */
+.login-gate::after {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: radial-gradient(170px circle at var(--lx, 50%) var(--ly, 34%),
+    rgba(255, 243, 205, .10), transparent 70%);
+}
+:root[data-theme="light"] .login-gate::after {
+  background: radial-gradient(170px circle at var(--lx, 50%) var(--ly, 34%),
+    rgba(96, 150, 96, .12), transparent 70%);
+}
+@media (prefers-reduced-motion: reduce) {
+  .sh-digit, .att-stamp-img.stamp-pop, .hof-title span { animation: none; }
+  .skin-card { transition: none; }
+}
+
 /* ── 요정 UI 에셋 (숲 배경 · 페이지 배너 · 버튼) ── */
 #app-bg {
   position: fixed; inset: 0; z-index: -1; pointer-events: none;

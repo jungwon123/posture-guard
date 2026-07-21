@@ -45,7 +45,7 @@ export default function AttendanceCard() {
           <div key={d.date} className={"att-day" + (d.isToday ? " today" : "")}>
             <span className="att-label">{d.label}</span>
             <span className="att-stamp">{att.days.has(d.date)
-              ? <img className="att-stamp-img" src="/assets/ui/ui-stamp-flower.png" alt="출석" />
+              ? <img className={"att-stamp-img" + (d.isToday ? " stamp-pop" : "")} src="/assets/ui/ui-stamp-flower.png" alt="출석" />
               : "·"}</span>
           </div>
         ))}
