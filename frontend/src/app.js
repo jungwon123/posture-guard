@@ -7,7 +7,7 @@ import {
 // 3D 절대 지표 레이어 — 개인 z-score 위에 "거리에 강한 + 절대 바른자세" 게이트를 얹는다(core 무수정).
 import { AbsSmoother, extractAbsolute, finishAbsRef, absPenalty, absDominant, headPoseFromMatrix,
   extractGuidePoints, finishGuide, projectGuide } from "./posture3d.js";
-import { Rewards, MELODIES, SKINS, SHOP, TIERS, computeReport } from "./reward.js";
+import { Rewards, MELODIES, SKINS, SHOP, TIERS, computeReport, hurtMotion } from "./reward.js";
 import { getAuth, syncPull, mergeData, startSyncLoop, writeDailySnapshot, pushDaily } from "./sync.js";
 
 // React 마운트 후 1회 실행 (엔진 계층 — 카메라 루프·판정·알림·PiP)
@@ -60,21 +60,28 @@ function skinAtlas() {
 }
 let praiseUntil = 0; // 복귀 직후 칭찬 모션
 let rewardUntil = 0; // 포인트·출석·구매 직후 보상 모션
+let encourageUntil = 0, nextEncourageAt = 0;                // 평상시 가끔 응원 모션(GOOD 지속 중 저빈도)
+const ENCOURAGE_EVERY = 180, ENCOURAGE_SECS = 4;            // GOOD 3분마다 4초간 encourage
+let hurtLatch = null, hurtLatchWorst = null, hurtLatchAt = 0; // BAD 아픔 모션 래치(원인 부위별)
+const HURT_HOLD_SECS = 4;                                   // 아픔 모션 최소 유지 — worst 요동에도 안 널뛰게
 
-// 상황 → 모션 (에셋 README의 권장 전이: 방치 alert → angry → hurt / 교정 encourage / 성공 praise / 보상 reward)
+// 상황 → 모션 (docs/기능-v2.md 3절 SSoT: 주의 alert → 무너짐 hurt_부위 → 방치 angry → 심각 hurt_부위
+//              / 교정 encourage / 성공 praise / 보상 reward / 평상시 가끔 encourage)
+// 헤더 요정·미니(PiP)·얼굴커버·Document PiP가 모두 이 함수를 쓴다 — 소비처 간 모션 일관 보장.
 function spriteAnim(state, now) {
   if (calibUntil !== null) return "encourage";              // 기준 등록 중 — "곧게 펴볼까요?"
   if (state === "BAD") {
     if (sm.cand?.[0] === "GOOD") return "encourage";        // 고치는 중 — 응원
     const dur = sm.stateSince ? now - sm.stateSince : 0;
-    if (dur >= TUNING.ESCALATE_VIGNETTE) return "hurt_neck"; // 오래 방치 — 거북목 아픔
-    if (dur >= TUNING.ESCALATE_NOTIFY) return "angry";      // "교정 안 했어?!"
-    return "alert";                                         // "자세가 틀어졌어요!"
+    if (dur >= TUNING.ESCALATE_VIGNETTE) return hurtLatch || "hurt_neck"; // 오래 방치 — 아픔 절정(원인 부위)
+    if (dur >= TUNING.ESCALATE_NOTIFY) return "angry";      // 에스컬레이션 — "교정 안 했어?!"
+    return hurtLatch || "hurt_neck";                        // 무너짐 — 원인 부위별 아픔(목/등/골반)
   }
-  if (state === "CAUTION") return "encourage";              // 주의 — "곧게 펴볼까요?" (알람 없이)
+  if (state === "CAUTION") return "alert";                  // 주의 — "자세가 틀어졌어요!" (알람 없이 표정만)
   if (sm.cand?.[0] === "BAD") return "encourage";           // 무너지는 중 — 다잡기
   if (now < rewardUntil) return "reward";                   // "보상 받았어요!"
   if (now < praiseUntil) return "praise";                   // "정말 잘하고 있어요!"
+  if (now < encourageUntil) return "encourage";             // 평상시 가끔 — "이대로 쭉!"
   return "idle"; // GOOD / AWAY / UNCALIBRATED (뒤 둘은 흐리게 표시)
 }
 const nowSec = () => Date.now() / 1000;
@@ -690,6 +697,7 @@ function tick() {
           sm = new StateMachine(); sm.state = "GOOD";
           // 재등록 시 이전 경고·에스컬레이션 상태 초기화(사용 시간 기록은 유지)
           escStep = 0; praiseUntil = 0; rewardUntil = 0; camMoveHits = 0;
+          encourageUntil = 0; nextEncourageAt = 0; hurtLatch = null; hurtLatchWorst = null;
           logTransition(null, "GOOD", now);
           els.btnCalib.textContent = "기준 다시 잡기";
           els.btnCalib.classList.remove("pulse");
@@ -733,6 +741,22 @@ function tick() {
       const d = absDominant(absM, absRef);
       if (d && d.c > worstC) { worstC = d.c; worst = d.key; }
     }
+    // BAD 아픔 모션 래치 — 원인(worst)별 부위 모션(hurt_neck/back/pelvis)을 고르되 최소
+    // HURT_HOLD_SECS 는 유지해, worst가 잘게 요동해도 모션이 널뛰지 않게 한다. BAD를 벗어나면 해제.
+    if (state === "BAD") {
+      if (!hurtLatch || (worst && !hurtLatchWorst)
+          || (worst && worst !== hurtLatchWorst && now - hurtLatchAt >= HURT_HOLD_SECS)) {
+        hurtLatch = hurtMotion(worst); hurtLatchWorst = worst; hurtLatchAt = now;
+      }
+    } else { hurtLatch = null; hurtLatchWorst = null; }
+    // 평상시 가끔 응원 — GOOD가 이어질 때 3분마다 4초간 encourage (보상·칭찬 모션과는 안 겹침)
+    if (state === "GOOD" && calibUntil === null) {
+      if (!nextEncourageAt) nextEncourageAt = now + ENCOURAGE_EVERY;
+      else if (now >= nextEncourageAt) {
+        if (now >= praiseUntil && now >= rewardUntil) encourageUntil = now + ENCOURAGE_SECS;
+        nextEncourageAt = now + ENCOURAGE_EVERY;
+      }
+    } else nextEncourageAt = now + ENCOURAGE_EVERY; // GOOD 이탈 시 타이머 리셋(복귀 직후엔 praise가 우선)
     window.__pgLive = { running: true, state, score, worst, dur, ts: now, sessionStart: sessionStartSec,
       pitch: faceHead ? Math.round(faceHead.pitch) : null, // 실기기 부호 확인·디버그용
       absOn: !!(absRef && absM),                            // 절대 게이트(어깨기울기·거북목·머리각) 작동 여부
@@ -764,6 +788,9 @@ function tick() {
       else if (state === "CAUTION" && prev === "GOOD") {
         // 주의 = 부드러운 조기 경고. 알람·진동·배너 없이 요정 말풍선만(과민 방지).
         speak("살짝 무너졌어요, 곧게 펴볼까요?");
+      }
+      else if (prev === "CAUTION" && state === "GOOD") {
+        praiseUntil = now + 2.5; // 주의에서 스스로 복귀 — 가벼운 칭찬 모션만(소리·알림 없음)
       }
       else if (prev === "BAD" && state === "GOOD") {
         praiseUntil = now + 3; // 칭찬 모션

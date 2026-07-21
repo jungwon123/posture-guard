@@ -30,6 +30,18 @@ export const SKINS = {
   idol:       IMG("아이돌 요정", "idol", "🎤"),
 };
 
+// BAD 원인 신호(worst) → 아픔 모션 (부위별 GIF/아틀라스 행). docs/기능-v2.md 3절 SSoT.
+// app.js(헤더·미니 PiP·얼굴커버)와 Buddy.jsx(말풍선 요정)가 공유 — 멘트 부위와 아픈 부위가 항상 일치.
+export const HURT_MOTION = {
+  // 머리·목 계열: 머리 가라앉음·거북목 전방이동 / 고개 숙임 / 화면 근접
+  head_drop: "hurt_neck", pitch: "hurt_neck", proximity: "hurt_neck",
+  // 어깨·등 계열: 어깨 말림(span 축소) / 어깨 기울기
+  shoulder_roll: "hurt_back", shoulder_tilt: "hurt_back",
+  // 삐딱함 계열: 좌우 쏠림·갸웃 / 턱괴기
+  head_tilt: "hurt_pelvis", hand_face: "hurt_pelvis",
+};
+export const hurtMotion = (worst) => HURT_MOTION[worst] || "hurt_neck";
+
 // 상점 등급 (목업: 레어/에픽/프리미엄)
 export const TIERS = [
   { id: "rare",    label: "레어",    sub: "특별한 시작!" },
