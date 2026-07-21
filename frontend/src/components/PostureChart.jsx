@@ -221,7 +221,8 @@ export default function PostureChart() {
 
       {tab === "chart" && (
         !anyData ? (
-          <p className="hint">아직 오늘 데이터가 없어요. 공부를 시작하면 자세 그래프가 여기 그려져요.</p>
+          <div className="empty-state"><img className="empty-art" src="/assets/ui/ui-empty-sprout.png" alt="" />
+            <p className="hint">아직 오늘 데이터가 없어요. 공부를 시작하면 자세 그래프가 여기 그려져요.</p></div>
         ) : (
           <div className="charts">
             <TrendBanner trend={d.trend} />

@@ -94,7 +94,8 @@ export default function CalendarCard() {
             <div className="cal-row"><span>최장 연속 바른자세</span><b>{fmtLong(rec.longestGood)}</b></div>
           </div>
         ) : (
-          <p className="hint">이날은 공부 기록이 없어요.</p>
+          <div className="empty-state sm"><img className="empty-art" src="/assets/ui/ui-empty-sprout.png" alt="" />
+            <p className="hint">이날은 공부 기록이 없어요.</p></div>
         )}
       </div>
     </div>

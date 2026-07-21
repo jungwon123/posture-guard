@@ -44,7 +44,9 @@ export default function AttendanceCard() {
         {att.week.map((d) => (
           <div key={d.date} className={"att-day" + (d.isToday ? " today" : "")}>
             <span className="att-label">{d.label}</span>
-            <span className="att-stamp">{att.days.has(d.date) ? "✓" : "·"}</span>
+            <span className="att-stamp">{att.days.has(d.date)
+              ? <img className="att-stamp-img" src="/assets/ui/ui-stamp-flower.png" alt="출석" />
+              : "·"}</span>
           </div>
         ))}
       </div>

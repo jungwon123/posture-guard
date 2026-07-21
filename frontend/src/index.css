@@ -903,3 +903,28 @@
 
 /* 계정 카드 버튼: accent 유지 + 프레임 */
 .account-card > button { background: url("/assets/ui/btn-frame.png") center / 100% 100% no-repeat, var(--accent); }
+
+/* ── 컴포넌트 내부 에셋 ── */
+/* 출석 도장: 꽃 */
+.att-stamp-img { width: 20px; height: 20px; object-fit: contain; vertical-align: middle; }
+/* 빈 상태 일러스트 */
+.empty-state { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 14px 0 6px; text-align: center; }
+.empty-state .empty-art { width: 84px; height: 84px; object-fit: contain; }
+.empty-state.sm .empty-art { width: 56px; height: 56px; }
+.gl-empty { text-align: center; }
+.gl-empty .empty-art { display: block; width: 72px; height: 72px; object-fit: contain; margin: 2px auto 8px; }
+/* 접기 메뉴 마커: 삼각형 → 새싹 (열면 곧게 섬) */
+details > summary { list-style: none; }
+details > summary::-webkit-details-marker { display: none; }
+details > summary::before { content: ""; display: inline-block; width: 16px; height: 11px; margin-right: 7px;
+  background: url("/assets/ui/ui-sprout.png") center / contain no-repeat;
+  transform: rotate(-90deg); transition: transform .15s ease; vertical-align: -1px; }
+details[open] > summary::before { transform: none; }
+/* 로그인 카드: 태그라인 아래 덩굴 디바이더 */
+.login-tagline { padding-bottom: 14px;
+  background: url("/assets/ui/ui-divider.png") bottom center / 150px auto no-repeat; }
+/* 캘린더 헤더 아래 디바이더 */
+.cal-head { position: relative; padding-bottom: 10px; }
+.cal-head::after { content: ""; position: absolute; left: 50%; bottom: 0; transform: translateX(-50%);
+  width: 55%; height: 10px; opacity: .6;
+  background: url("/assets/ui/ui-divider.png") center / contain no-repeat; }

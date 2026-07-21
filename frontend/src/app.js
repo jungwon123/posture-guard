@@ -1418,7 +1418,7 @@ function renderGroupSwitcher() {
   const add = $("group-add");
   if (add) add.open = !list.length; // 그룹 없으면 추가 폼 펼침, 있으면 접어 단순화
   if (!list.length) {
-    el.innerHTML = `<div class="gl-empty">아직 들어간 그룹이 없어요.<br>아래에서 그룹을 만들거나 코드로 참여해요</div>`;
+    el.innerHTML = `<div class="gl-empty"><img class="empty-art" src="/assets/ui/ui-empty-sprout.png" alt="">아직 들어간 그룹이 없어요.<br>아래에서 그룹을 만들거나 코드로 참여해요</div>`;
     return;
   }
   const multi = list.length > 1;
