@@ -302,6 +302,8 @@
 
 /* ── 멀티 페이지 (v3) ── */
 .page { padding-bottom: 76px; }
+/* 디자인 시스템: 페이지 좌우 가터 16px (.card margin과 동일 기준) */
+.page-gutter { margin-inline: 16px; }
 #bottom-nav {
   position: fixed; bottom: 0; left: 0; right: 0; z-index: 40;
   display: flex; background: var(--panel); border-top: 1px solid var(--line);

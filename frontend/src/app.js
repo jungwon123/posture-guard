@@ -476,7 +476,6 @@ function processBlink(now) {
   if (!blinkSampling) {
     if (now < nextBlinkAt) {
       const left = Math.max(0, Math.round(nextBlinkAt - now));
-      els.blink.style.display = "";
       els.blink.textContent = blinkRate === null ? `깜빡임 ${left}초 후 측정` : `깜빡임 ${blinkRate}회/분`;
       return;
     }
@@ -484,7 +483,6 @@ function processBlink(now) {
   }
 
   // 샘플 창: 이번 틱 얼굴 결과에서 깜빡임(눈 감김의 상승 에지) 카운트
-  els.blink.style.display = "";
   els.blink.textContent = "깜빡임 측정 중…";
   const bs = lastFaceFr?.faceBlendshapes?.[0]?.categories;
   if (bs) {

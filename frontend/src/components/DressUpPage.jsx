@@ -41,19 +41,19 @@ export default function DressUpPage() {
         </div>
       </div>
 
-      <div className="seg-tabs">
+      <div className="seg-tabs page-gutter">
         <button className={seg === "equip" ? "on" : ""} onClick={() => setSeg("equip")}>내 요정</button>
         <button className={seg === "shop" ? "on" : ""} onClick={() => setSeg("shop")}>상점</button>
       </div>
 
       {/* 내 요정 (장착) — 엔진이 #equip-grid 렌더 */}
-      <div style={{ display: seg === "equip" ? undefined : "none" }}>
+      <div className="page-gutter" style={{ display: seg === "equip" ? undefined : "none" }}>
         <div id="equip-grid" className="equip-grid"></div>
         <p className="hint">보유한 요정을 눌러 바로 갈아입어요. 새 요정은 [상점]에서 포인트로 사요.</p>
       </div>
 
       {/* 상점 — 엔진이 #shop-list 렌더 */}
-      <div style={{ display: seg === "shop" ? undefined : "none" }}>
+      <div className="page-gutter" style={{ display: seg === "shop" ? undefined : "none" }}>
         <div id="shop-list"></div>
         <p className="hint">공부로 모은 포인트로 새 요정을 데려와요.</p>
       </div>
