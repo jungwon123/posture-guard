@@ -172,7 +172,9 @@
   .sh-status.off { color: var(--dim); background: color-mix(in srgb, var(--dim) 14%, transparent); }
   @keyframes shPulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
   @media (prefers-reduced-motion: reduce) { .sh-status.on .sh-dot { animation: none; } }
-  .sh-time { font-size: 40px; font-weight: 900; letter-spacing: -.02em; font-variant-numeric: tabular-nums; margin: 6px 0 4px; }
+  .sh-time { font-size: 40px; font-weight: 900; letter-spacing: -.02em; font-variant-numeric: tabular-nums; margin: 6px 0 2px; }
+  .sh-session { font-size: 12.5px; color: var(--dim); margin: 0 0 6px; }
+  .sh-session b { color: var(--good); font-weight: 800; font-variant-numeric: tabular-nums; }
   .sh-chips { display: flex; gap: 8px; flex-wrap: wrap; }
   .sh-chip { font-size: 12.5px; color: var(--dim); background: var(--bg); border: 1px solid var(--line);
     border-radius: 999px; padding: 3px 11px; }
@@ -189,6 +191,12 @@
   .together-cta .tc-body b { font-size: 14px; font-weight: 800; color: var(--text); }
   .together-cta .tc-body span { font-size: 12px; color: var(--dim); }
   .together-cta .tc-arrow { color: var(--dim); font-size: 20px; flex: none; }
+  .together-cta .tc-badge { flex: none; display: inline-flex; align-items: center; gap: 5px;
+    font-size: 12px; font-weight: 800; color: var(--good);
+    background: color-mix(in srgb, var(--good) 15%, transparent); border-radius: 999px; padding: 3px 10px; }
+  .together-cta .tc-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--good);
+    animation: shPulse 1.4s ease-in-out infinite; }
+  @media (prefers-reduced-motion: reduce) { .together-cta .tc-dot { animation: none; } }
 
   /* ── 꾸미기(상점+캐릭터) 헤더 — 장착 미리보기 | 포인트 ── */
   .dressup-head { display: flex; gap: 8px; align-items: stretch; margin: 4px 16px 8px; padding: 14px; }

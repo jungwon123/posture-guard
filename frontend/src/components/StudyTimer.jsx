@@ -34,6 +34,9 @@ export default function StudyTimer() {
   try { events = JSON.parse(localStorage.getItem("pg_events") || "[]"); } catch {}
   const rep = computeReport(events, dayStartSec(), nowSec());
   const live = (typeof window !== "undefined" && window.__pgLive) || {};
+  // 이번 세션 공부시간 = 세션 시작 이후 watched(자리 지키며 공부). 종료하면 사라짐.
+  const sessionSec = (live.running && live.sessionStart)
+    ? computeReport(events, live.sessionStart, nowSec()).watched : null;
   const studying = !!live.running && (live.state === "GOOD" || live.state === "CAUTION" || live.state === "BAD");
   const away = !!live.running && live.state === "AWAY";
   const status = !live.running ? { cls: "off", text: "꺼짐" }
@@ -52,6 +55,9 @@ export default function StudyTimer() {
         </span>
       </div>
       <div className="sh-time">{fmtClock(rep.watched)}</div>
+      {sessionSec != null && (
+        <div className="sh-session">▶ 이번 세션 <b>{fmtClock(sessionSec)}</b></div>
+      )}
       <div className="sh-chips">
         <span className="sh-chip">바른자세 <b>{ratio != null ? ratio + "%" : "—"}</b></span>
         <span className="sh-chip">🔥 <b>{streak}일</b> 연속</span>

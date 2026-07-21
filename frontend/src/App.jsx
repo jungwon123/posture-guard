@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import Header from "./components/Header.jsx";
 import MainPanels from "./components/MainPanels.jsx";
 import StudyTimer from "./components/StudyTimer.jsx";
+import TogetherCta from "./components/TogetherCta.jsx";
 import Controls from "./components/Controls.jsx";
 import AttendanceCard from "./components/AttendanceCard.jsx";
 import PostureChart from "./components/PostureChart.jsx";
@@ -37,11 +38,7 @@ export default function App() {
         <StudyTimer />
         <MainPanels />
         <Controls />
-        <button className="together-cta" onClick={() => setPage("group")}>
-          <span className="tc-emoji">👥</span>
-          <span className="tc-body"><b>함께 공부</b><span>친구들과 같이 집중해요</span></span>
-          <span className="tc-arrow">›</span>
-        </button>
+        <TogetherCta onGo={() => setPage("group")} />
         <AttendanceCard />
         <button id="fab-stats" title="차트·기록 보기" aria-label="통계 보기" onClick={() => setShowStats(true)}>📊 통계</button>
       </div>

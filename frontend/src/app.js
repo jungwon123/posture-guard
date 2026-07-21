@@ -94,6 +94,7 @@ let smoother = new SignalSmoother();
 let judge = null;
 let sm = new StateMachine();
 let running = false;
+let sessionStartSec = null; // 이번 공부 세션 시작 시각(초). '공부 시작' 시 세팅, 종료 시 null.
 let bgTickSet = false;
 let calibUntil = null, calibSamples = [];
 let absSmoother = new AbsSmoother(); // 3D 지표 One-Euro
@@ -313,6 +314,7 @@ async function start() {
     return;
   }
   running = true;
+  sessionStartSec = nowSec(); // 세션 타이머 기준
   els.btnStart.textContent = "공부 종료";
   els.btnStart.classList.add("danger"); // 공부 중엔 종료 버튼임을 색으로 분명히
   els.btnStart.disabled = false;
@@ -618,7 +620,7 @@ function tick() {
       const d = absDominant(absM, absRef);
       if (d && d.c > worstC) { worstC = d.c; worst = d.key; }
     }
-    window.__pgLive = { running: true, state, score, worst, dur, ts: now,
+    window.__pgLive = { running: true, state, score, worst, dur, ts: now, sessionStart: sessionStartSec,
       pitch: faceHead ? Math.round(faceHead.pitch) : null, // 실기기 부호 확인·디버그용
       absOn: !!(absRef && absM),                            // 절대 게이트(어깨기울기·거북목·머리각) 작동 여부
       absPen: (absRef && absM) ? +absPenalty(absM, absRef).toFixed(2) : null, // 총 절대 페널티
@@ -1366,6 +1368,23 @@ async function pollNudges() {
 }
 setInterval(uploadPresence, 30_000);
 setInterval(pollNudges, 30_000);
+
+// '지금 공부 중인 친구 수' — 활성 그룹 리더보드의 presence(ago_sec·state)로 계산(백엔드 무변경).
+// 온라인(≤90초 전 프레즌스) + 자리비움 아님 + 나 제외 = 공부 중인 친구. window.__pgStudying로 노출.
+window.__pgStudying = null;
+async function pollStudyingCount() {
+  const g = myGroup();
+  if (!g) { window.__pgStudying = null; window.dispatchEvent(new CustomEvent("pg-studying", { detail: null })); return; }
+  try {
+    const { rows } = await api(`leaderboard?code=${g.code}&week=${weekKey()}`);
+    const n = (rows || []).filter((r) =>
+      r.member_id !== memberId && r.ago_sec != null && r.ago_sec <= 90 && r.state !== "AWAY").length;
+    window.__pgStudying = n;
+    window.dispatchEvent(new CustomEvent("pg-studying", { detail: n }));
+  } catch {}
+}
+setInterval(pollStudyingCount, 45_000);
+pollStudyingCount();
 renderGroupSwitcher();  // 로컬 목록으로 즉시 칩 표시
 refreshLeaderboard();   // 그룹 페이지는 기본 열림 — 첫 로드 시 표시
 reconcileGroups();      // 서버 목록과 동기화(비동기)
