@@ -277,7 +277,7 @@ app.post("/api/rtc-token", async (req, res) => {
   if (!q.rows.length) return bad(res, 404, "그룹 멤버만 가능해요");
   const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET,
     { identity: memberId, name: q.rows[0].nickname, ttl: "2h" });
-  at.addGrant({ roomJoin: true, room: `pg-${code}`, canPublish: true, canSubscribe: true });
+  at.addGrant({ roomJoin: true, room: `pg-${code}`, canPublish: true, canSubscribe: true, canPublishData: true });
   const token = await at.toJwt(); // v2: async
   return res.json({ token, url: LIVEKIT_URL, room: `pg-${code}`, configured: true });
 });

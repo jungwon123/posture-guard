@@ -1,7 +1,7 @@
 {
-  "tool_name": "mcp__Claude_Browser__javascript_tool",
-  "tool_input_preview": "{\"action\":\"javascript_exec\",\"tabId\":\"tab-3\",\"text\":\"\\nwindow.dispatchEvent(new CustomEvent(\\\"pg-nudge\\\",{detail:{from:\\\"수연\\\"}}));\\n// pin open for the screenshot (cancel the 5s auto-hide just for this...",
-  "error": "javascript_tool failed: SyntaxError: Identifier 'el' has already been declared",
-  "timestamp": "2026-07-21T01:49:07.231Z",
+  "tool_name": "mcp__Claude_Browser__computer",
+  "tool_input_preview": "{\"action\":\"wait\",\"duration\":5}",
+  "error": "MCP error -32602: Input validation error: Invalid arguments for tool computer: [\n  {\n    \"expected\": \"string\",\n    \"code\": \"invalid_type\",\n    \"path\": [\n      \"tabId\"\n    ],\n    \"message\": \"Invalid input: expected string, received undefined\"\n  }\n]",
+  "timestamp": "2026-07-21T02:57:36.502Z",
   "retry_count": 1
 }

@@ -94,7 +94,11 @@ function RoomInner({ onClose }) {
     const tick = () => {
       const live = window.__pgLive;
       const body = live?.running ? { state: live.state, score: live.score } : { state: "off" };
-      try { room.localParticipant.publishData(enc.encode(JSON.stringify(body)), { reliable: false, topic: "posture" }); } catch {}
+      // 연결 완료 전 발행 금지: livekit-client가 첫 publishData 실패(연결 중)를 영구 캐시해
+      // 세션 내내 데이터 발행이 전부 죽는다 (점수·콕 안 보이던 원인)
+      if (room.state === "connected") {
+        try { room.localParticipant.publishData(enc.encode(JSON.stringify(body)), { reliable: false, topic: "posture" })?.catch?.(() => {}); } catch {}
+      }
       const me = myId();
       if (me) setPostures((m) => ({ ...m, [me]: { ...body, ts: Date.now() } }));
     };
@@ -121,11 +125,12 @@ function RoomInner({ onClose }) {
 
   const sendNudge = useCallback((toId, toNick) => {
     if (cooldown[toId] && Date.now() < cooldown[toId]) return;
+    if (room.state !== "connected") return; // 연결 전 발행 금지 (위 tick 주석 참고)
     const myNick = room.localParticipant?.name || "친구";
     try {
       room.localParticipant.publishData(
         enc.encode(JSON.stringify({ type: "nudge", from: myNick })),
-        { reliable: true, topic: "nudge", destinationIdentities: [toId] });
+        { reliable: true, topic: "nudge", destinationIdentities: [toId] })?.catch?.(() => {});
       setCooldown((c) => ({ ...c, [toId]: Date.now() + NUDGE_COOLDOWN }));
     } catch {}
   }, [room, cooldown]);
