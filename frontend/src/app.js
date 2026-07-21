@@ -109,7 +109,7 @@ let camRef = null;                   // 캘리브 시점 카메라 프레이밍(
 let camCalibSamples = [];            // 캘리브 중 프레이밍 수집
 let camMoveHits = 0;                 // 프레이밍이 크게 어긋난 연속 틱 수
 let lastCamWarn = 0;                 // 마지막 '카메라 위치 바뀜' 안내 시각(초) — 도배 방지
-let escFired = false;
+let escStep = 0;                     // 마지막으로 에스컬레이션 알림을 보낸 단계(Math.floor(dur/ESCALATE_NOTIFY)) — 단계가 오를 때만 1회 발사
 let lastDetect = 0;
 let lastActiveSec = +(localStorage.getItem("pg_last_active") || 0); // 마지막 실제 감지 틱 시각(초). 세션 간 유지 → 재로드 시 열린 세그먼트 무한연장 방지.
 let lastActivePersist = 0;
@@ -262,9 +262,20 @@ function notify(body) {
   try { new Notification("척추요정", { body, tag: "posture-guard" }); } catch { showToast(body); }
 }
 let audioCtx = null;
+// 첫 제스처에서 오디오 컨텍스트를 깨워둔다 — 자동재생 정책·iOS 백그라운드 복귀로 suspended가 된 뒤에도
+// 다음 터치에서 소리가 다시 나오게. (매 호출은 상태 검사뿐이라 비용 없음)
+document.addEventListener("pointerdown", () => {
+  try {
+    audioCtx = audioCtx || new AudioContext();
+    if (audioCtx.state !== "running") audioCtx.resume?.().catch(() => {});
+  } catch {}
+}, { passive: true });
 function playNotes(notes, volume) {
   try {
     audioCtx = audioCtx || new AudioContext();
+    // 멈춘(suspended) 컨텍스트의 currentTime은 흐르지 않아 여기에 예약하면 재개 순간 밀린 소리가
+    // 한꺼번에 터진다(폭탄음). 재개만 요청하고 이번 재생은 건너뛴다 — 알림은 어차피 주기 반복된다.
+    if (audioCtx.state !== "running") { audioCtx.resume?.().catch(() => {}); return; }
     let t = audioCtx.currentTime;
     for (const [freq, dur] of notes) {
       if (freq > 0) {
@@ -674,7 +685,7 @@ function tick() {
           absSmoother = new AbsSmoother();
           sm = new StateMachine(); sm.state = "GOOD";
           // 재등록 시 이전 경고·에스컬레이션 상태 초기화(사용 시간 기록은 유지)
-          escFired = false; praiseUntil = 0; rewardUntil = 0; camMoveHits = 0;
+          escStep = 0; praiseUntil = 0; rewardUntil = 0; camMoveHits = 0;
           logTransition(null, "GOOD", now);
           els.btnCalib.textContent = "기준 다시 잡기";
           els.btnCalib.classList.remove("pulse");
@@ -741,7 +752,7 @@ function tick() {
 
     if (state !== prev) {
       logTransition(prev, state, now);
-      escFired = false;
+      escStep = 0;
       if (state === "BAD") {
         const m = `${face} 자세가 틀어졌어요! 허리를 펴요`;
         notify(m); playAlert(1, m); speak("허리 펴요!");
@@ -758,15 +769,14 @@ function tick() {
           playNotes(MELODIES.sparkle.notes, rewards.settings.volume * 0.6);
       }
     }
-    // 에스컬레이션: 숨김 중에도 알림은 반복 도달 (60초마다)
+    // 에스컬레이션: 숨김 중에도 알림은 반복 도달. 단계(step)가 오르는 순간에만 정확히 1회 발사 —
+    // 시간 창으로 재무장하면 그 창 동안 매 틱 발사/재무장이 반복돼 알림음이 연사된다.
     if (state === "BAD") {
       const step = Math.floor(dur / TUNING.ESCALATE_NOTIFY);
-      if (step >= 1 && !escFired) {
-        escFired = true;
+      if (step >= 1 && step > escStep) {
+        escStep = step;
         const m2 = `${face} 교정 안 했어?! ${Math.round(dur)}초째 나쁜 자세예요`;
         notify(m2); playAlert(2, m2); speak("아직도요? 허리 펴요!");
-      } else if (step >= 1 && escFired && dur % TUNING.ESCALATE_NOTIFY < 1.2) {
-        escFired = false; // 60초마다 재무장
       }
     }
     // 포인트 적립 (GOOD 1분당 +1P)

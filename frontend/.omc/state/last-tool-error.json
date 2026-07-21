@@ -1,7 +1,7 @@
 {
-  "tool_name": "mcp__Claude_Browser__computer",
-  "tool_input_preview": "{\"action\":\"wait\",\"duration\":5}",
-  "error": "MCP error -32602: Input validation error: Invalid arguments for tool computer: [\n  {\n    \"expected\": \"string\",\n    \"code\": \"invalid_type\",\n    \"path\": [\n      \"tabId\"\n    ],\n    \"message\": \"Invalid input: expected string, received undefined\"\n  }\n]",
-  "timestamp": "2026-07-21T02:57:36.502Z",
+  "tool_name": "mcp__Claude_Browser__navigate",
+  "tool_input_preview": "{\"url\":\"http://localhost:5173\",\"force\":true}",
+  "error": "MCP error -32602: Input validation error: Invalid arguments for tool navigate: [\n  {\n    \"expected\": \"string\",\n    \"code\": \"invalid_type\",\n    \"path\": [\n      \"tabId\"\n    ],\n    \"message\": \"Invalid input: expected string, received undefined\"\n  }\n]",
+  "timestamp": "2026-07-21T16:49:26.817Z",
   "retry_count": 1
 }
