@@ -354,13 +354,20 @@
   width: 30px; height: 30px; padding: 0; color: var(--dim); font-size: 15px; }
 .stats-sheet .chart-card { border: none; margin: 0; }
 
-/* ── 로그인 게이트 (앱 시작 화면) ── */
+/* ── 시작 화면 게이트 (앱 로그인) — 메인처럼 숲 배경 + 스크림 ── */
 .login-gate {
   position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center;
-  padding: 20px; background: var(--bg); overflow-y: auto;
+  padding: 24px; overflow-y: auto;
+  background:
+    linear-gradient(rgba(16, 20, 24,.80), rgba(16, 20, 24,.93)),
+    url("/assets/ui/forest-bg.png") center / cover no-repeat;
+}
+:root[data-theme="light"] .login-gate {
+  background:
+    linear-gradient(rgba(250, 250, 252,.72), rgba(250, 250, 252,.90)),
+    url("/assets/ui/forest-bg.png") center / cover no-repeat;
 }
 @media (min-width: 600px) { .login-gate { max-width: 430px; margin-inline: auto; } }
-.login-gate .login-card { width: 100%; max-width: 380px; }
 
 /* ── 요정 UI 에셋 (숲 배경 · 페이지 배너 · 버튼) ── */
 #app-bg {
@@ -381,28 +388,45 @@
 @media (prefers-reduced-motion: reduce) { .page-banner { animation: none; } }
 /* 출석 카드 캘린더 아이콘 */
 .att-ic { width: 42px; height: 42px; object-fit: contain; flex: none; }
-/* 로그인 히어로 + 시작하기 버튼 */
-.login-hero { text-align: center; background: linear-gradient(rgba(23,28,34,.60), rgba(23,28,34,.86)); }
-:root[data-theme="light"] .login-hero { background: linear-gradient(rgba(255,255,255,.55), rgba(255,255,255,.82)); }
-.login-start { position: relative; background: none; border: none; padding: 0; margin: 6px auto 4px; cursor: pointer; display: block; }
-/* 뼈다귀 에셋의 흰 글로우를 감싸는 따뜻한 스포트라이트 — 후광이 의도된 발광으로 녹아든다 */
-.login-start::before {
-  content: ""; position: absolute; inset: -14% -4%; z-index: 0; border-radius: 50%;
-  background: radial-gradient(ellipse at center, rgba(255,206,120,.30), rgba(255,206,120,0) 68%);
-  filter: blur(6px); pointer-events: none;
+/* 시작 화면 글래스 카드 (HeroUI/Ant 톤) */
+.login-card-v2 {
+  width: 100%; max-width: 360px; text-align: center;
+  background: color-mix(in srgb, var(--panel) 76%, transparent);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  border: 1px solid color-mix(in srgb, #fff 12%, var(--line));
+  border-radius: 24px; padding: 30px 24px 22px;
+  box-shadow: 0 24px 64px rgba(12, 16, 24,.5), inset 0 1px 0 rgba(255, 255, 255,.10);
 }
-.login-start img { position: relative; z-index: 1; width: min(300px, 82%); filter: drop-shadow(0 6px 18px rgba(12, 16, 24,.4)); transition: transform .15s; }
-.login-start:hover img { transform: scale(1.03); }
-.login-start:active img { transform: scale(.97); }
-/* 정체성 태그라인 + 3기둥 (시작화면) */
-.login-tagline { font-size: 15px; font-weight: 800; letter-spacing: -.02em; color: var(--text); margin: 2px 0 12px; }
-.login-pillars { display: flex; justify-content: center; gap: 8px; margin: 0 0 6px; }
-.login-pillars span { display: flex; flex-direction: column; align-items: center; gap: 3px;
-  font-size: 11.5px; color: var(--dim); font-weight: 700; background: var(--bg);
-  border: 1px solid var(--line); border-radius: 12px; padding: 8px 6px; flex: 1; }
-.login-pillars b { font-size: 18px; }
-.login-more { margin-top: 8px; text-align: left; }
-.login-more summary { cursor: pointer; }
+@media (prefers-reduced-transparency: reduce) { .login-card-v2 { background: var(--panel); backdrop-filter: none; -webkit-backdrop-filter: none; } }
+.login-logo { width: 76px; height: 76px; border-radius: 22px; margin: 0 auto 14px; display: block;
+  box-shadow: 0 10px 28px rgba(12, 16, 24,.4); }
+.login-title { font-size: 25px; font-weight: 900; letter-spacing: -.02em; margin: 0; }
+.login-tagline { font-size: 14px; font-weight: 700; color: var(--dim); margin: 8px 0 18px; }
+/* 정체성 3기둥 */
+.login-pillars { display: flex; gap: 8px; margin: 0 0 22px; }
+.login-pillars span { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;
+  font-size: 11.5px; color: var(--dim); font-weight: 700;
+  background: color-mix(in srgb, var(--bg) 50%, transparent);
+  border: 1px solid var(--line); border-radius: 14px; padding: 11px 6px; }
+.login-pillars b { font-size: 20px; }
+/* 프라이머리 버튼 (솔리드, 라운드) */
+.login-primary {
+  width: 100%; background: var(--accent); color: #101418;
+  font-size: 16px; font-weight: 800; border: none; border-radius: 14px; padding: 14px;
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--accent) 42%, transparent);
+  transition: transform .1s ease, filter .15s ease;
+}
+.login-primary:hover { filter: brightness(1.05); }
+.login-primary:active { transform: translateY(1px) scale(.99); }
+.login-note { font-size: 12px; color: var(--dim); line-height: 1.65; margin: 14px 2px 2px; }
+/* 로그인 폼 (준비 중) */
+.login-more { margin-top: 4px; }
+.login-more summary { cursor: pointer; font-size: 12.5px; color: var(--dim); list-style: none; padding: 6px; }
+.login-more summary::-webkit-details-marker { display: none; }
+.login-more[open] summary { color: var(--text); }
+.login-form { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.login-form input, .login-form button { width: 100%; }
 
 .card {
   background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
