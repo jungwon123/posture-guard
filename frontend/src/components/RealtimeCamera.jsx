@@ -53,14 +53,14 @@ export default function RealtimeCamera() {
 
   return (
     <details id="rtc" open>
-      <summary>📹 실시간 자세 보기 (같은 그룹)</summary>
+      <summary>실시간 자세 보기 (같은 그룹)</summary>
 
       <div className="rtc-share">
         <label className="rtc-toggle">
           <input type="checkbox" checked={sharing} onChange={(e) => setSharing(e.target.checked)} />
           <span>내 카메라 공유하기</span>
         </label>
-        {sharing && <span className="rtc-live">🔴 공유 중{watcherN ? ` · ${watcherN}명이 보는 중` : ""}</span>}
+        {sharing && <span className="rtc-live">공유 중{watcherN ? ` · ${watcherN}명이 보는 중` : ""}</span>}
       </div>
       <p className="hint">
         켜면 <b>같은 그룹 친구만</b> 내 카메라를 실시간으로 볼 수 있어요. 영상은 <b>서버에 저장되지 않고</b> 친구 기기로 직접(P2P) 전송돼요. 카메라가 켜져 있어야 공유됩니다.
@@ -73,7 +73,7 @@ export default function RealtimeCamera() {
           <div key={p.memberId} className="rtc-peer">
             <span className="rtc-nick">{p.nick}</span>
             {p.sharing
-              ? <button className="rtc-view" onClick={() => openView(p)}>📹 자세 보기</button>
+              ? <button className="rtc-view" onClick={() => openView(p)}>자세 보기</button>
               : <span className="rtc-off">공유 안 함</span>}
           </div>
         ))}

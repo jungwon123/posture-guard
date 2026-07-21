@@ -28,7 +28,7 @@ export default function CharacterPage() {
         <b>{skin.label}</b>
       </div>
       <details id="character-equip" open>
-        <summary>🎽 갈아입히기</summary>
+        <summary>갈아입히기</summary>
         <div id="equip-grid" className="equip-grid"></div>
         <p className="hint">보유한 요정을 눌러 바로 갈아입어요. 새 요정은 [상점]에서 포인트로 살 수 있어요.</p>
       </details>

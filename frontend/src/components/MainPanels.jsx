@@ -15,7 +15,7 @@ export default function MainPanels() {
         {/* 카메라 시작 전 — 가장 먼저 눌러야 할 큰 시작 버튼 (첫 화면 길잡이) */}
         <div id="start-cta">
           <div className="start-cta-desc">요정이 지켜보는 공부방, 시작할까요?</div>
-          <button id="btn-start-hero" className="primary">📚 공부 시작</button>
+          <button id="btn-start-hero" className="primary">공부 시작</button>
           <div className="start-cta-sub">영상은 저장되지 않고 자세만 살펴봐요</div>
         </div>
 
@@ -28,7 +28,7 @@ export default function MainPanels() {
 
         {/* 자리 비움 — 측정이 멈췄음을 분명히 안내 */}
         <div id="away-notice">
-          <div className="away-emoji">⏸️</div>
+          
           <div className="away-title">측정을 잠시 멈췄어요</div>
           <div className="away-sub">자리를 비운 것 같아요.<br />다시 앉으면 이어서 측정해요</div>
         </div>

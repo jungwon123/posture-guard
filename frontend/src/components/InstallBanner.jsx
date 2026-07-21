@@ -3,7 +3,7 @@ export default function InstallBanner() {
   return (
     <>
       <div id="install-banner">
-        <span className="ib-icon">📲</span>
+        
         <span className="ib-text" id="install-text"></span>
         <button className="ib-action" id="install-action">설치</button>
         <button className="ib-close" id="install-close">✕</button>

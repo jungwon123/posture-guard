@@ -40,7 +40,7 @@ export default function App() {
         <Controls />
         <TogetherCta onGo={() => setPage("group")} />
         <AttendanceCard />
-        <button id="fab-stats" title="차트·기록 보기" aria-label="통계 보기" onClick={() => setShowStats(true)}>📊 통계</button>
+        <button id="fab-stats" title="차트·기록 보기" aria-label="통계 보기" onClick={() => setShowStats(true)}>통계</button>
       </div>
 
       <div className="page" style={show("group")}>

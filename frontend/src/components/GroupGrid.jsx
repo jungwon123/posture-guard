@@ -13,14 +13,14 @@ export default function GroupGrid() {
   if (!group) return null;
   return (
     <details id="rtc" open>
-      <summary>📹 실시간 자세 그리드 (같은 그룹)</summary>
+      <summary>실시간 자세 그리드 (같은 그룹)</summary>
       {!open ? (
         <>
           <p className="hint">
             같은 그룹 친구들과 <b>실시간 카메라 그리드</b>로 함께 공부해요. 열면 그룹 방에 접속하고,
             <b> 카메라 공유는 옵트인</b>(직접 켜야 보임)이에요.
           </p>
-          <button className="rtc-view" onClick={() => setOpen(true)}>📹 실시간 그리드 열기</button>
+          <button className="rtc-view" onClick={() => setOpen(true)}>실시간 그리드 열기</button>
         </>
       ) : (
         <Suspense fallback={<p className="hint">불러오는 중…</p>}>

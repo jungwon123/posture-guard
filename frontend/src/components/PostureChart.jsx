@@ -136,7 +136,7 @@ function readData() {
   }
 
   // 오늘 상태 변화 로그(최근 15개)
-  const L = { GOOD: "바른 자세 🟢", CAUTION: "주의 🟡", BAD: "나쁜 자세 🔴", AWAY: "자리 비움 ⚪" };
+  const L = { GOOD: "바른 자세", CAUTION: "주의", BAD: "나쁜 자세", AWAY: "자리 비움" };
   const log = events.filter((ev) => ev.t >= t0 && ev.from && L[ev.to]).slice(-15).reverse()
     .map((ev) => ({ time: new Date(ev.t * 1000).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }), text: L[ev.to] }));
 
@@ -155,12 +155,12 @@ function readData() {
 // 월간 추세 배너 — 기울기 부호로 격려/주의. 데이터 부족하면 안내만.
 function TrendBanner({ trend }) {
   if (!trend || trend.insufficient) {
-    return <div className="trend-banner flat">📈 며칠 더 기록하면 <b>한 달 자세 추세</b>를 보여줄게요 (최소 4일)</div>;
+    return <div className="trend-banner flat">며칠 더 기록하면 <b>한 달 자세 추세</b>를 보여줄게요 (최소 4일)</div>;
   }
   const pw = trend.perWeek;
-  if (pw >= 2) return <div className="trend-banner up">📈 최근 {trend.days}일 <b>좋아지고 있어요 ↗</b> · 주당 +{Math.round(pw)}%p</div>;
-  if (pw <= -2) return <div className="trend-banner down">📉 최근 {trend.days}일 <b>조금씩 나빠지고 있어요 ↘</b> · 자세에 신경 써봐요 (주당 {Math.round(pw)}%p)</div>;
-  return <div className="trend-banner flat">📊 최근 {trend.days}일 <b>꾸준히 유지 중</b> · 평균 바름 {trend.avg}%</div>;
+  if (pw >= 2) return <div className="trend-banner up">최근 {trend.days}일 <b>좋아지고 있어요</b> · 주당 +{Math.round(pw)}%p</div>;
+  if (pw <= -2) return <div className="trend-banner down">최근 {trend.days}일 <b>조금씩 나빠지고 있어요</b> · 자세에 신경 써봐요 (주당 {Math.round(pw)}%p)</div>;
+  return <div className="trend-banner flat">최근 {trend.days}일 <b>꾸준히 유지 중</b> · 평균 바름 {trend.avg}%</div>;
 }
 
 function Delta({ now, prev, unit, pct }) {

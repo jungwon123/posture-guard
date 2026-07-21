@@ -3,7 +3,7 @@ export default function ReportOverlay() {
   return (
     <div id="report-overlay">
       <div id="report-card">
-        <h2>📋 오늘 리포트</h2>
+        <h2>오늘 리포트</h2>
         <img
           id="report-fairy"
           style={{ width: "72px", height: "72px", imageRendering: "pixelated", display: "block", margin: "0 auto 10px" }}

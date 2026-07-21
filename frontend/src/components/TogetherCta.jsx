@@ -14,7 +14,7 @@ export default function TogetherCta({ onGo }) {
   const live = n != null && n > 0;
   return (
     <button className="together-cta" onClick={onGo}>
-      <span className="tc-emoji">👥</span>
+      
       <span className="tc-body">
         <b>함께 공부</b>
         <span>{live ? `지금 친구 ${n}명이 공부 중이에요` : "친구들과 같이 집중해요"}</span>

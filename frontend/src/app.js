@@ -177,7 +177,7 @@ function checkCameraMoved(now) {
   if (camMoveHits >= 25 && now - lastCamWarn > 45) { // ~2.5초(10Hz) 지속 + 45초 쿨다운
     lastCamWarn = now; camMoveHits = 0;
     const m = "카메라 위치가 바뀐 것 같아요 — 위치를 조정하거나 [기준 다시 잡기]를 눌러 주세요";
-    showToast(m); speak("카메라가 움직였나요? 🎥");
+    showToast(m); speak("카메라가 움직였나요?");
   }
 }
 
@@ -204,13 +204,34 @@ function showToast(body) {
 function showNudge(from) {
   let el = document.getElementById("nudge-banner");
   if (!el) { el = document.createElement("div"); el.id = "nudge-banner"; el.className = "nudge-banner"; document.body.appendChild(el); }
-  el.innerHTML = `👉 <b>${esc(from || "친구")}</b>님이 콕! 찔렀어요. 허리 펴요!`;
+  el.innerHTML = `<b>${esc(from || "친구")}</b>님이 콕 찔렀어요. 허리 펴요!`;
   el.classList.remove("show"); void el.offsetWidth; el.classList.add("show"); // 리플로우로 슬라이드 애니 재시작
   clearTimeout(showNudge._t);
   showNudge._t = setTimeout(() => el.classList.remove("show"), 5000);
   try { navigator.vibrate?.([160, 80, 160, 80, 220]); } catch {}
-  playAlert(1, `${from || "친구"}님이 콕! 찔렀어요`); // 소리(설정 따름)
-  speak("허리 펴라고 콕! 😤");
+  playNudgeSound(); // 콕 전용 사운드 — 자세 알림 멜로디와 구분되는 짧은 노크음
+  // 아이폰(진동 API 없음): 시스템 재알림으로 진동 유도
+  if (!navigator.vibrate && typeof Notification !== "undefined" && Notification.permission === "granted" && navigator.serviceWorker) {
+    navigator.serviceWorker.ready.then((reg) =>
+      reg.showNotification("척추요정", { body: `${from || "친구"}님이 콕 찔렀어요. 허리 펴요!`, tag: "pg-nudge", renotify: true })
+    ).catch(() => {});
+  }
+  speak("허리 펴라고 콕!");
+  pipNudgeShow(from); // 미니 창(PiP)을 보고 있으면 거기에도 표시
+}
+
+// 콕 전용 사운드: 짧은 노크 2번 + 높은 마무리. 자세 알림 멜로디와 확실히 구분된다.
+const NUDGE_NOTES = [[1318, 0.09], [0, 0.05], [1318, 0.09], [0, 0.05], [1760, 0.18]];
+function playNudgeSound() {
+  const s = rewards.settings;
+  if (s.mode === "sound" || s.mode === "both") playNotes(NUDGE_NOTES, s.volume);
+}
+
+// ── PiP 창 안 콕 알림 (미니 창만 보고 공부할 때 놓치지 않게) ──
+let pipNudge = null; // { from, until(초) }
+function pipNudgeShow(from) {
+  pipNudge = { from: from || "친구", until: nowSec() + 4 };
+  if (docPip) updateDocPip(sm.state, null, nowSec()); // 즉시 반영 (다음 틱 안 기다림)
 }
 function notify(body) {
   if (typeof Notification === "undefined" || Notification.permission !== "granted") {
@@ -456,7 +477,7 @@ function processBlink(now) {
     if (now < nextBlinkAt) {
       const left = Math.max(0, Math.round(nextBlinkAt - now));
       els.blink.style.display = "";
-      els.blink.textContent = blinkRate === null ? `👁 ${left}s후 측정` : `👁 ${blinkRate}회/분`;
+      els.blink.textContent = blinkRate === null ? `깜빡임 ${left}초 후 측정` : `깜빡임 ${blinkRate}회/분`;
       return;
     }
     blinkSampling = true; blinkWinStart = now; blinkCount = 0; blinkClosed = false; blinkFaceFrames = 0;
@@ -464,7 +485,7 @@ function processBlink(now) {
 
   // 샘플 창: 이번 틱 얼굴 결과에서 깜빡임(눈 감김의 상승 에지) 카운트
   els.blink.style.display = "";
-  els.blink.textContent = "👁 측정 중…";
+  els.blink.textContent = "깜빡임 측정 중…";
   const bs = lastFaceFr?.faceBlendshapes?.[0]?.categories;
   if (bs) {
     blinkFaceFrames++;
@@ -484,10 +505,10 @@ function processBlink(now) {
     }
     blinkRate = Math.round(blinkCount / (BLINK_WINDOW_SEC / 60));
     logBlink(blinkRate); // 리포트·차트용 오늘 로그 적재
-    els.blink.textContent = `👁 ${blinkRate}회/분`;
+    els.blink.textContent = `깜빡임 ${blinkRate}회/분`;
     els.blinkStatus.textContent = `방금 측정: 분당 ${blinkRate}회 (정상 ${BLINK_NORMAL_LO}~${BLINK_NORMAL_HI})`;
     if (blinkRate < BLINK_LOW_RATE) {
-      notify(`👁 눈이 건조해질 수 있어요. 잠깐 눈을 깜빡이거나 먼 곳을 봐요 (분당 ${blinkRate}회)`);
+      notify(`눈이 건조해질 수 있어요. 잠깐 눈을 깜빡이거나 먼 곳을 봐요 (분당 ${blinkRate}회)`);
     }
   }
 }
@@ -596,8 +617,8 @@ function tick() {
           els.msg.textContent = "기준 등록 완료. 척추요정이 깨어났어요!";
           centerPop(wasRegistered
             ? `<div class="cp-title">새 기준으로 다시 시작해요</div><div class="cp-sub">이전 경고는 초기화했어요 · 기록 시간은 그대로 이어져요</div>`
-            : `<div class="cp-title">공부 바른자세 등록 완료!</div><div class="cp-sub">이제 척추요정이 지켜봐요 👀<br>화면↔책으로 자세가 바뀌면 [기준 다시 잡기]</div>`, 3000);
-          speak(wasRegistered ? "새 기준으로 시작! 💚" : "준비 완료! 지켜볼게요 👀");
+            : `<div class="cp-title">공부 바른자세 등록 완료!</div><div class="cp-sub">이제 척추요정이 지켜봐요.<br>화면↔책으로 자세가 바뀌면 [기준 다시 잡기]</div>`, 3000);
+          speak(wasRegistered ? "새 기준으로 시작해요" : "준비 완료, 지켜볼게요");
         } else {
           els.msg.textContent = "몸이 잘 안 잡혔어요. 다시 [기준 등록]을 눌러주세요.";
           centerPop(`<div class="cp-title">등록에 실패했어요</div><div class="cp-sub">얼굴과 어깨가 보이게 앉은 뒤 다시 눌러 주세요</div>`, 2600);
@@ -659,15 +680,15 @@ function tick() {
       escFired = false;
       if (state === "BAD") {
         const m = `${face} 자세가 틀어졌어요! 허리를 펴요`;
-        notify(m); playAlert(1, m); speak("허리 펴요! 🔥");
+        notify(m); playAlert(1, m); speak("허리 펴요!");
       }
       else if (state === "CAUTION" && prev === "GOOD") {
         // 주의 = 부드러운 조기 경고. 알람·진동·배너 없이 요정 말풍선만(과민 방지).
-        speak("살짝 무너졌어요, 곧게 펴볼까요? 🌱");
+        speak("살짝 무너졌어요, 곧게 펴볼까요?");
       }
       else if (prev === "BAD" && state === "GOOD") {
         praiseUntil = now + 3; // 칭찬 모션
-        speak("잘하고 있어요! 💚");
+        speak("잘하고 있어요");
         notify(`${rewards.fairy("GOOD", 0, false)} 정말 잘하고 있어요! 포인트 다시 적립`);
         if (rewards.settings.mode === "sound" || rewards.settings.mode === "both")
           playNotes(MELODIES.sparkle.notes, rewards.settings.volume * 0.6);
@@ -679,13 +700,13 @@ function tick() {
       if (step >= 1 && !escFired) {
         escFired = true;
         const m2 = `${face} 교정 안 했어?! ${Math.round(dur)}초째 나쁜 자세예요`;
-        notify(m2); playAlert(2, m2); speak("아직도?! 😤");
+        notify(m2); playAlert(2, m2); speak("아직도요? 허리 펴요!");
       } else if (step >= 1 && escFired && dur % TUNING.ESCALATE_NOTIFY < 1.2) {
         escFired = false; // 60초마다 재무장
       }
     }
     // 포인트 적립 (GOOD 1분당 +1P)
-    if (rewards.tick(state, now, dateStr()) > 0) { flashPoints(); rewardUntil = now + 2.5; speak("+1P! 🪙"); }
+    if (rewards.tick(state, now, dateStr()) > 0) { flashPoints(); rewardUntil = now + 2.5; speak("포인트 적립!"); }
 
     checkCameraMoved(now);   // 카메라 위치 크게 바뀌면 재등록 안내
     updateOverlays(state);   // 시작 CTA·등록 카운트다운·자리비움 오버레이 갱신
@@ -699,7 +720,7 @@ function renderUI(state, score, zs, now, face) {
   els.pill.textContent = STATE_LABEL[state] || state;
   els.pill.style.background = STATE_COLOR[state];
   els.score.textContent = score === null ? "score --" : `score ${score.toFixed(1)}`;
-  els.points.textContent = `🪙 ${rewards.points}P`;
+  els.points.textContent = `${rewards.points}P`;
 
   const badCand = sm.cand?.[0] === "BAD";
   updateFairyVisual(state, badCand, now, face);
@@ -848,7 +869,7 @@ function drawTracking(state, zs) {
   const readout = [];
   if (lastAbs?.shoulderTilt != null) readout.push(["어깨 수평도", `${lastAbs.shoulderTilt.toFixed(0)}°`, lastAbs.shoulderTilt > 12]);
   if (lastAbs?.headPitch != null) readout.push(["머리 각도", `${lastAbs.headPitch >= 0 ? "+" : ""}${lastAbs.headPitch.toFixed(0)}°`, false]);
-  if (guideRef && aligned != null) readout.push(["머리 정렬", aligned ? "좋음 ✓" : "숙임/거북목", !aligned]);
+  if (guideRef && aligned != null) readout.push(["머리 정렬", aligned ? "좋음" : "숙임/거북목", !aligned]);
   ctx.font = "13px sans-serif"; ctx.textAlign = "left";
   readout.forEach(([label, val, warn], i) => {
     const y = 22 + i * 21;
@@ -901,6 +922,17 @@ function drawMini(state, score, face, badCand, now) {
   ctx.beginPath(); ctx.arc(96, h / 2, 8, 0, 7); ctx.fill();
   ctx.fillStyle = "#e7ecf1"; ctx.font = "bold 24px sans-serif";
   ctx.fillText(score === null ? state : `${state} ${Math.round(score)}`, 112, h / 2 + 9);
+  // 콕 알림 오버레이: PiP 창 전체를 덮는 점멸 배너 (캔버스 PiP 폴백 경로)
+  if (pipNudge && now < pipNudge.until) {
+    const blink = Math.floor(now * 3) % 2 === 0;
+    ctx.fillStyle = blink ? "#c93838" : "#a52e2e";
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = "#fff"; ctx.font = "bold 26px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText(`${pipNudge.from}님이 콕!`, w / 2, h / 2 - 4);
+    ctx.font = "bold 18px sans-serif";
+    ctx.fillText("허리 펴요", w / 2, h / 2 + 24);
+    ctx.textAlign = "left";
+  } else if (pipNudge) pipNudge = null;
 }
 
 let docPip = null; // Document PiP (Chrome): HTML 창이라 GIF가 원래 속도로 재생됨
@@ -963,15 +995,24 @@ async function openDocPip() {
         .emoji { font-size:44px; display:none; }
         .dot { width:16px; height:16px; border-radius:50%; flex:none; }
         .label { font-size:22px; font-weight:700; white-space:nowrap; }
+        .nudge { position:fixed; inset:0; display:none; flex-direction:column; align-items:center;
+                 justify-content:center; gap:4px; background:#c93838; color:#fff; text-align:center;
+                 animation:nudgeBlink .5s step-end infinite; }
+        .nudge.show { display:flex; }
+        .nudge b { font-size:24px; }
+        .nudge span { font-size:16px; font-weight:700; }
+        @keyframes nudgeBlink { 0%,100% { background:#c93838; } 50% { background:#a52e2e; } }
       </style>`;
       win.document.body.innerHTML =
-        `<img alt="척추요정"><span class="emoji"></span><span class="dot"></span><span class="label"></span>`;
+        `<img alt="척추요정"><span class="emoji"></span><span class="dot"></span><span class="label"></span>` +
+        `<div class="nudge"><b></b><span>허리 펴요</span></div>`;
       docPip = {
         win,
         img: win.document.querySelector("img"),
         emoji: win.document.querySelector(".emoji"),
         dot: win.document.querySelector(".dot"),
         label: win.document.querySelector(".label"),
+        nudge: win.document.querySelector(".nudge"),
       };
       win.addEventListener("pagehide", () => { docPip = null; });
       updateDocPip(sm.state, null, nowSec());
@@ -993,6 +1034,10 @@ function updateDocPip(state, score, now) {
   }
   docPip.dot.style.background = STATE_COLOR[state];
   docPip.label.textContent = score === null ? state : `${state} ${Math.round(score)}`;
+  // 콕 알림: PiP 창 전체를 덮는 점멸 배너
+  const nudging = pipNudge && now < pipNudge.until;
+  if (nudging) docPip.nudge.querySelector("b").textContent = `${pipNudge.from}님이 콕!`;
+  docPip.nudge.classList.toggle("show", !!nudging);
 }
 
 // ── 오늘 리포트 ──
@@ -1008,7 +1053,7 @@ function openReport() {
     ["최장 연속 바른 자세", fmtMin(rep.longestGood)],
   ];
   if (blinkEnabled || bt.n) // 눈 깜빡임: 오늘 평균(분당). 정상 15~20
-    rows.push(["👁 오늘 평균 깜빡임", bt.n ? `분당 ${bt.avg}회 (정상 ${BLINK_NORMAL_LO}~${BLINK_NORMAL_HI})` : "아직 측정 전"]);
+    rows.push(["오늘 평균 깜빡임", bt.n ? `분당 ${bt.avg}회 (정상 ${BLINK_NORMAL_LO}~${BLINK_NORMAL_HI})` : "아직 측정 전"]);
   rows.push(["오늘 얻은 포인트", `+${todayEarned}P`]);
   els.reportTable.innerHTML = rows.map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join("");
   els.reportGrade.textContent = rep.grade;
@@ -1064,7 +1109,7 @@ function buyItem(item) {
     rewardUntil = nowSec() + 2.5; // "보상 받았어요!" 모션
     updateFairyVisual(sm.state, false, nowSec(), rewards.fairy(sm.state, 0, false));
   }
-  els.points.textContent = `🪙 ${rewards.points}P`;
+  els.points.textContent = `${rewards.points}P`;
 }
 
 function renderShop() {
@@ -1084,7 +1129,7 @@ function renderShop() {
       const card = document.createElement("div");
       card.className = "skin-card";
       const thumb = item.soon
-        ? `<div class="skin-thumb lock">🔒</div>`
+        ? `<div class="skin-thumb lock">잠김</div>`
         : `<img class="skin-thumb" src="${sk.spriteDir}/idle.gif" alt="${item.label}" loading="lazy">`;
       const action = item.soon ? `<span class="soon-tag">준비 중</span>`
         : owned ? `<span class="owned-tag">✓ 보유</span>`
@@ -1255,20 +1300,20 @@ function renderHallOfFame(rows, champions = []) {
     ${renderHofCards(rows, champions)}
   </div>`;
 }
-// 실데이터 배지 — 🔥 최고 연속출석자 · 👑 이번 주 1위 · 역대 챔피언(명예의 전당)
+// 실데이터 배지 — 최고 연속출석자 · 이번 주 1위 · 역대 챔피언(명예의 전당)
 function renderHofCards(rows, champions) {
   const topStreak = rows.filter((r) => (r.streak || 0) >= 2).sort((a, b) => b.streak - a.streak)[0];
   const leader = rows[0] && rows[0].good_sec > 0 ? rows[0] : null;
   const streakCard = topStreak
-    ? `<span class="hof-ic">🔥</span><span><b>${esc(topStreak.nickname)}</b> · ${topStreak.streak}일 연속 출석 중!</span>`
-    : `<span class="hof-ic">🔥</span><span>연속 출석에 도전! 매일 켜면 <b>연속 배지</b>를 얻어요.</span>`;
+    ? `<span><b>${esc(topStreak.nickname)}</b> · ${topStreak.streak}일 연속 출석 중!</span>`
+    : `<span>연속 출석에 도전! 매일 켜면 <b>연속 배지</b>를 얻어요.</span>`;
   const crownCard = leader
-    ? `<span class="hof-ic">👑</span><span>이번 주 1위 <b>${esc(leader.nickname)}</b> · ${(leader.good_sec / 60).toFixed(0)}분</span>`
-    : `<span class="hof-ic">👑</span><span>이번 주 1위 자리는 아직 비어있어요!</span>`;
+    ? `<span>이번 주 1위 <b>${esc(leader.nickname)}</b> · ${(leader.good_sec / 60).toFixed(0)}분</span>`
+    : `<span>이번 주 1위 자리는 아직 비어있어요!</span>`;
   const champs = (champions && champions.length)
     ? `<div class="hof-champs"><div class="hof-champs-t">역대 챔피언</div>${champions.map((c) =>
         `<div class="champ-row"><span class="champ-week">${champWeekLabel(c.week)}</span>` +
-        `<span class="champ-nick">🏅 ${esc(c.nickname)}</span>` +
+        `<span class="champ-nick">${esc(c.nickname)}</span>` +
         `<span class="champ-sec">${(c.good_sec / 60).toFixed(0)}분</span></div>`).join("")}</div>`
     : "";
   return `<div class="hof-cards">
@@ -1309,17 +1354,17 @@ function renderGroupSwitcher() {
   const add = $("group-add");
   if (add) add.open = !list.length; // 그룹 없으면 추가 폼 펼침, 있으면 접어 단순화
   if (!list.length) {
-    el.innerHTML = `<div class="gl-empty">아직 들어간 그룹이 없어요.<br>아래에서 그룹을 만들거나 코드로 참여해요 👇</div>`;
+    el.innerHTML = `<div class="gl-empty">아직 들어간 그룹이 없어요.<br>아래에서 그룹을 만들거나 코드로 참여해요</div>`;
     return;
   }
   const multi = list.length > 1;
   el.innerHTML = `<div class="gl-label">내 그룹${multi ? ` ${list.length}개 · 탭해서 이동` : ""}</div>` +
     `<div class="gl-list">` + list.map((g) => {
       const on = active && active.code === g.code;
-      const cnt = g.members ? `<span class="gl-cnt">· 👥 ${g.members}명</span>` : "";
+      const cnt = g.members ? `<span class="gl-cnt">· ${g.members}명</span>` : "";
       const badge = (on && multi) ? `<span class="gl-badge">보는 중</span>` : "";
       return `<div class="gl-room${on ? " active" : ""}" data-code="${g.code}">
-        <div class="gl-avatar">${on ? "🟢" : "🏠"}</div>
+        <div class="gl-avatar${on ? " on" : ""}"></div>
         <div class="gl-body">
           <div class="gl-top"><span class="gl-name">${esc(g.name)}</span>${badge}</div>
           <div class="gl-meta">코드 ${g.code} · 나: ${esc(g.nickname)} ${cnt}</div>
@@ -1409,7 +1454,7 @@ els.btnCalib.onclick = () => {
   calibSamples = []; absCalibSamples = []; guideCalibSamples = []; camCalibSamples = []; absSmoother = new AbsSmoother();
   els.calibCount.textContent = String(TUNING.CALIB_SECS);
   updateOverlays(sm.state); // 등록 안내 오버레이 즉시 표시
-  speak("평소 공부 자세로, 등·목만 곧게 🧘");
+  speak("평소 공부 자세로, 등과 목만 곧게 펴요");
 };
 els.btnNotify.onclick = async () => {
   playNotes(MELODIES.sparkle.notes, rewards.settings.volume); // 사용자 제스처로 오디오 잠금 해제 (아이폰 필수 — 가장 먼저)
@@ -1487,29 +1532,29 @@ if (new URLSearchParams(location.search).has("fwd")) {
     if (devMax != null) {
       const noise = devSamples.length > 4
         ? Math.max(...devSamples) - Math.min(...devSamples) : null;
-      if (devMax > 0.12) verdict = `부호 정상 ✅ (거북목서 Δ +${devMax.toFixed(2)}까지)`;
-      else if (devMin < -0.12) verdict = `부호 뒤집힘 ❌ (거북목서 Δ −로 감) → forwardTerm 부호 반전 필요`;
+      if (devMax > 0.12) verdict = `부호 정상 (거북목서 Δ +${devMax.toFixed(2)}까지)`;
+      else if (devMin < -0.12) verdict = `부호 뒤집힘 (거북목서 Δ −로 감) → forwardTerm 부호 반전 필요`;
       else verdict = `아직 변화 작음 (Δ범위 ${devMin?.toFixed(2)}~${devMax?.toFixed(2)})`;
-      if (noise != null && noise > 0.20) verdict += ` ⚠️노이즈 큼(${noise.toFixed(2)})`;
+      if (noise != null && noise > 0.20) verdict += ` [주의] 노이즈 큼(${noise.toFixed(2)})`;
     }
     const tiltBad = (L.tilt != null && L.tiltRef != null) && (L.tilt > L.tiltRef + 3);
     const spanDrop = (L.span != null && L.spanRef != null) ? (L.spanRef - L.span) / L.spanRef : null;
     const spanBad = spanDrop != null && spanDrop > 0.06;
     dbg.textContent =
       `자세 게이트 진단\n` +
-      `게이트: ${L.absOn ? "ON ✅" : "OFF ❌(재캘리브 필요)"}\n` +
+      `게이트: ${L.absOn ? "ON" : "OFF (재캘리브 필요)"}\n` +
       `[Z부호 검증] ${verdict}\n` +
       `총 페널티: ${L.absPen ?? "-"}\n` +
-      `─ 거북목 fwd: ${L.fwd ?? "-"} / 기준 ${L.fwdRef ?? "-"} · Δ ${dev ?? "-"} ${fwdBad ? "⚠️" : ""}\n` +
-      `─ 어깨기울 : ${L.tilt ?? "-"}° / 기준 ${L.tiltRef ?? "-"}° ${tiltBad ? "⚠️감점" : "(기준+3°~)"}\n` +
-      `─ 어깨말림 : ${L.span ?? "-"} / 기준 ${L.spanRef ?? "-"} · 축소 ${spanDrop != null ? (spanDrop * 100).toFixed(0) + "%" : "-"} ${spanBad ? "⚠️감점" : "(6%~)"}\n` +
-      `─ 좌우쏠림 : ${L.lat ?? "-"} / 기준 ${L.latRef ?? "-"} ${(L.lat != null && L.latRef != null && Math.abs(L.lat - L.latRef) > 0.12) ? "⚠️감점" : "(±0.12~)"}\n` +
-      `─ 갸웃 roll: ${L.roll ?? "-"}° / 기준 ${L.rollRef ?? "-"}° ${(L.roll != null && L.rollRef != null && Math.abs(L.roll - L.rollRef) > 10) ? "⚠️감점" : "(±10°~)"}\n` +
-      `─ 턱괴기 hand: ${L.hand ?? "-"} ${(L.hand != null && L.hand < 0.65) ? "⚠️감점" : "(<0.65)"}\n` +
+      `─ 거북목 fwd: ${L.fwd ?? "-"} / 기준 ${L.fwdRef ?? "-"} · Δ ${dev ?? "-"} ${fwdBad ? "[감점]" : ""}\n` +
+      `─ 어깨기울 : ${L.tilt ?? "-"}° / 기준 ${L.tiltRef ?? "-"}° ${tiltBad ? "[감점]" : "(기준+3°~)"}\n` +
+      `─ 어깨말림 : ${L.span ?? "-"} / 기준 ${L.spanRef ?? "-"} · 축소 ${spanDrop != null ? (spanDrop * 100).toFixed(0) + "%" : "-"} ${spanBad ? "[감점]" : "(6%~)"}\n` +
+      `─ 좌우쏠림 : ${L.lat ?? "-"} / 기준 ${L.latRef ?? "-"} ${(L.lat != null && L.latRef != null && Math.abs(L.lat - L.latRef) > 0.12) ? "[감점]" : "(±0.12~)"}\n` +
+      `─ 갸웃 roll: ${L.roll ?? "-"}° / 기준 ${L.rollRef ?? "-"}° ${(L.roll != null && L.rollRef != null && Math.abs(L.roll - L.rollRef) > 10) ? "[감점]" : "(±10°~)"}\n` +
+      `─ 턱괴기 hand: ${L.hand ?? "-"} ${(L.hand != null && L.hand < 0.65) ? "[감점]" : "(<0.65)"}\n` +
       `─ 머리각 pitch: ${L.pitch ?? "-"}°`;
   }, 300);
 }
-els.points.textContent = `🪙 ${rewards.points}P`;
+els.points.textContent = `${rewards.points}P`;
 updateFairyVisual(sm.state, false, nowSec(), rewards.fairy(sm.state, 0, false));
 updateOverlays("AWAY"); // 첫 화면 — 큰 [카메라 시작] CTA 표시
 
@@ -1517,7 +1562,7 @@ updateOverlays("AWAY"); // 첫 화면 — 큰 [카메라 시작] CTA 표시
 const themeBtn = $("theme-toggle");
 function applyMode(mode) {
   document.documentElement.setAttribute("data-theme", mode);
-  if (themeBtn) themeBtn.textContent = mode === "light" ? "☀️" : "🌙";
+  if (themeBtn) themeBtn.textContent = mode === "light" ? "다크" : "라이트";
   localStorage.setItem("pg_mode", mode);
 }
 applyMode(localStorage.getItem("pg_mode") || "dark");

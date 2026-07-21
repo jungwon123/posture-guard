@@ -37,14 +37,14 @@ export default function AttendanceCard() {
         <img className="att-ic" src="/assets/ui/attendance.png" alt="" aria-hidden="true" />
         <b>출석체크</b>
         <span className="hint">
-          {todayDone ? `오늘 출석 완료! ${att.streak}일 연속 🔥` : "카메라를 시작하면 출석 도장이 찍혀요 (+10P)"}
+          {todayDone ? `오늘 출석 완료 · ${att.streak}일 연속` : "카메라를 시작하면 출석 도장이 찍혀요 (+10P)"}
         </span>
       </div>
       <div className="att-week">
         {att.week.map((d) => (
           <div key={d.date} className={"att-day" + (d.isToday ? " today" : "")}>
             <span className="att-label">{d.label}</span>
-            <span className="att-stamp">{att.days.has(d.date) ? "🧚" : "·"}</span>
+            <span className="att-stamp">{att.days.has(d.date) ? "✓" : "·"}</span>
           </div>
         ))}
       </div>

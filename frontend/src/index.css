@@ -117,13 +117,12 @@
   }
   .start-cta-desc { color: var(--text); font-size: 17px; font-weight: 700; letter-spacing: -.02em; }
   #btn-start-hero { font-size: 17px; font-weight: 800; padding: 13px 26px; border-radius: 12px;
-    box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 45%, transparent); }
+    box-shadow: 0 6px 18px rgba(12, 16, 24,.25); }
   .start-cta-sub { color: var(--dim); font-size: 12px; }
   .calib-instr { color: var(--text); font-size: 17px; font-weight: 800; letter-spacing: -.02em; }
   .calib-count { font-size: 66px; font-weight: 900; line-height: 1; color: var(--accent);
-    font-variant-numeric: tabular-nums; text-shadow: 0 3px 14px color-mix(in srgb, var(--accent) 40%, transparent); }
+    font-variant-numeric: tabular-nums; }
   .calib-sub { color: var(--dim); font-size: 13px; }
-  .away-emoji { font-size: 46px; line-height: 1; }
   .away-title { color: var(--text); font-size: 18px; font-weight: 800; }
   .away-sub { color: var(--dim); font-size: 13px; line-height: 1.55; }
   /* 중앙 팝업 — 등록 완료·측정 종료 요약 */
@@ -186,7 +185,6 @@
     background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; text-align: left;
   }
   .together-cta:hover { border-color: var(--accent); }
-  .together-cta .tc-emoji { font-size: 22px; flex: none; }
   .together-cta .tc-body { flex: 1; display: flex; flex-direction: column; gap: 1px; }
   .together-cta .tc-body b { font-size: 14px; font-weight: 800; color: var(--text); }
   .together-cta .tc-body span { font-size: 12px; color: var(--dim); }
@@ -242,7 +240,8 @@
     border-color: var(--accent);
     background: color-mix(in srgb, var(--accent) 12%, var(--bg));
   }
-  .gl-avatar { font-size: 20px; width: 26px; text-align: center; flex-shrink: 0; }
+  .gl-avatar { width: 10px; height: 10px; border-radius: 50%; background: var(--line); flex-shrink: 0; }
+  .gl-avatar.on { background: #2f8f3f; }
   .gl-body { flex: 1; min-width: 0; }
   .gl-top { display: flex; align-items: center; gap: 6px; }
   .gl-name { font-weight: 700; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -294,7 +293,6 @@
     box-shadow: 0 6px 24px rgba(12, 16, 24,.5); max-width: 520px; margin: 0 auto;
   }
   #install-banner.show { display: flex; }
-  #install-banner .ib-icon { font-size: 26px; flex: none; }
   #install-banner .ib-text { flex: 1; font-size: 13.5px; line-height: 1.4; }
   #install-banner .ib-action {
     background: var(--accent); border-color: var(--accent); color: #101418; font-weight: 700;
@@ -320,7 +318,7 @@
 }
 #bottom-nav button.on { color: var(--accent); font-weight: 700; }
 #bottom-nav button.on .nav-ic {
-  filter: saturate(1.05) drop-shadow(0 0 5px color-mix(in srgb, var(--accent) 65%, transparent));
+  filter: saturate(1.05);
   transform: scale(1.12) translateY(-1px);
 }
 #bottom-nav button:active .nav-ic { transform: scale(.94); }
@@ -414,7 +412,7 @@
 .login-primary {
   width: 100%; background: var(--accent); color: #101418;
   font-size: 16px; font-weight: 800; border: none; border-radius: 14px; padding: 14px;
-  box-shadow: 0 10px 24px color-mix(in srgb, var(--accent) 42%, transparent);
+  box-shadow: 0 10px 24px rgba(12, 16, 24,.30);
   transition: transform .1s ease, filter .15s ease;
 }
 .login-primary:hover { filter: brightness(1.05); }
@@ -476,7 +474,7 @@
   text-align: center; display: flex; flex-direction: column; align-items: center; gap: 6px;
   background:
     url("/assets/ui/tier-epic.png") center / 100% 100% no-repeat,
-    radial-gradient(66% 52% at 50% 44%, rgba(184,150,238,.20), transparent 62%),
+    radial-gradient(66% 52% at 50% 44%, rgba(184,150,238,.12), transparent 62%),
     linear-gradient(180deg, rgba(34,40,52,.58), rgba(18,22,30,.82)); }
 :root[data-theme="light"] .char-card { background:
     url("/assets/ui/tier-epic.png") center / 100% 100% no-repeat,
@@ -503,7 +501,7 @@
     radial-gradient(120% 78% at 50% 30%, rgba(150,160,190,.14), transparent 62%),
     linear-gradient(180deg, rgba(255,255,255,.72), rgba(246,241,251,.88)); }
 .equip-card:active { transform: scale(.96); }
-.equip-card.on { box-shadow: 0 0 0 2px var(--accent), 0 0 15px color-mix(in srgb, var(--accent) 55%, transparent); }
+.equip-card.on { box-shadow: 0 0 0 2px var(--accent); }
 .equip-thumb { width: 54px; height: 54px; object-fit: contain; image-rendering: pixelated;
   filter: drop-shadow(0 2px 3px rgba(12, 16, 24,.3)); }
 .equip-thumb.emoji { font-size: 40px; line-height: 54px; }
@@ -576,7 +574,7 @@
 
 #theme-toggle {
   background: none; border: 1px solid var(--line); border-radius: 8px;
-  padding: 4px 9px; font-size: 15px; cursor: pointer; line-height: 1;
+  padding: 5px 10px; font-size: 12px; font-weight: 700; color: var(--dim); cursor: pointer; line-height: 1;
 }
 
 /* ── 캐릭터 말풍선 ── */
@@ -613,19 +611,19 @@
   background:
     url("/assets/ui/card-frame.png") center / 100% 100% no-repeat,
     radial-gradient(56% 13% at 50% 77%, rgba(255,255,255,.16), transparent 72%),
-    radial-gradient(122% 80% at 50% 30%, var(--card-glow, rgba(150,160,190,.18)), transparent 62%),
+    radial-gradient(122% 80% at 50% 30%, var(--card-glow, rgba(150,160,190,.10)), transparent 62%),
     linear-gradient(180deg, rgba(34,40,52,.60), rgba(18,22,30,.80)); }
-.tier-rare .skin-card    { --card-glow: rgba(120,220,140,.24); }
-.tier-epic .skin-card    { --card-glow: rgba(184,150,238,.26); }
-.tier-premium .skin-card { --card-glow: rgba(242,202,120,.26); }
+.tier-rare .skin-card    { --card-glow: rgba(120,220,140,.12); }
+.tier-epic .skin-card    { --card-glow: rgba(184,150,238,.13); }
+.tier-premium .skin-card { --card-glow: rgba(242,202,120,.13); }
 :root[data-theme="light"] .skin-card { background:
     url("/assets/ui/card-frame.png") center / 100% 100% no-repeat,
     radial-gradient(56% 13% at 50% 77%, rgba(255,255,255,.6), transparent 72%),
-    radial-gradient(122% 80% at 50% 30%, var(--card-glow, rgba(150,160,190,.18)), transparent 62%),
+    radial-gradient(122% 80% at 50% 30%, var(--card-glow, rgba(150,160,190,.10)), transparent 62%),
     linear-gradient(180deg, rgba(255,255,255,.72), rgba(246,241,251,.88)); }
 .skin-thumb { width: 64px; height: 64px; image-rendering: pixelated; object-fit: contain;
   filter: drop-shadow(0 3px 4px rgba(12, 16, 24,.30)); }
-.skin-thumb.lock { display: flex; align-items: center; justify-content: center; font-size: 30px; opacity: .45; }
+.skin-thumb.lock { display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: var(--dim); opacity: .8; }
 .skin-name { font-size: 12px; font-weight: 600; text-align: center; line-height: 1.2; }
 .skin-action { margin-top: auto; padding-top: 2px; }  /* 버튼 하단 정렬(이름 줄수 달라도 맞춤) */
 .buy-btn { background: var(--accent); color: #101418; border: none; border-radius: 999px;
@@ -699,7 +697,6 @@
 .hof-card { background: url("/assets/ui/card-frame.png") center / 100% 100% no-repeat, #ffffff08;
   border: none; border-radius: 12px; padding: 13px 15px;
   display: flex; align-items: center; gap: 8px; font-size: 12px; color: #d5dcf5; line-height: 1.4; }
-.hof-card .hof-ic { font-size: 20px; flex: none; }
 .hof-card b { color: #ffe08a; }
 /* 리스트(4위+) 각자 장착 스킨 미니 아바타 */
 .hof-ava { width: 26px; height: 26px; flex: none; border-radius: 50%; object-fit: contain;
@@ -790,7 +787,7 @@
   position: fixed; z-index: 54; width: 15px; height: 15px; margin: -7px 0 0 -7px;
   pointer-events: none; background: var(--spark, #ffd76a);
   clip-path: polygon(50% 0%, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0% 50%, 40% 40%);
-  filter: drop-shadow(0 0 3px var(--spark)); opacity: 0;
+  opacity: 0;
   animation: buddySpark 950ms ease-out forwards;
 }
 @keyframes buddySpark {

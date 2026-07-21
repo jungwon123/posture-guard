@@ -21,9 +21,9 @@ function PostureTile({ postures, onNudge, cooldown }) {
   const fresh = info && Date.now() - info.ts < 6000; // 6초 지나면 오래된 정보로 간주
   const state = fresh ? info.state : null;
   const nick = pt?.name || "친구";
-  const badge = state === "BAD" ? `🔴 ${Math.round(info.score ?? 0)}점`
-    : state === "GOOD" ? `🟢 ${Math.round(info.score ?? 0)}점`
-    : state === "AWAY" ? "⚪ 자리비움"
+  const badge = state === "BAD" ? `${Math.round(info.score ?? 0)}점`
+    : state === "GOOD" ? `${Math.round(info.score ?? 0)}점`
+    : state === "AWAY" ? "자리비움"
     : state === "off" ? "카메라 꺼짐" : "…";
   const bcol = state === "BAD" ? "#e64545" : state === "GOOD" ? "#2f8f3f" : "#59636e";
   const onCd = id && cooldown[id] && Date.now() < cooldown[id];
@@ -36,7 +36,7 @@ function PostureTile({ postures, onNudge, cooldown }) {
       </div>
       {pt && !pt.isLocal && (
         <button className="grid-nudge" disabled={onCd} onClick={() => onNudge(id, nick)}>
-          {onCd ? "콕 보냈어요 ✓" : "👉 자세 콕!"}
+          {onCd ? "콕 보냈어요" : "자세 콕"}
         </button>
       )}
     </div>
@@ -77,7 +77,7 @@ function ShareToggle() {
           <input type="checkbox" checked={on} onChange={(e) => toggle(e.target.checked)} />
           <span>내 카메라 공유하기</span>
         </label>
-        {on && <span className="rtc-live">🔴 공유 중</span>}
+        {on && <span className="rtc-live">공유 중</span>}
       </div>
       {msg && <p className="hint rtc-err">{msg}</p>}
     </>

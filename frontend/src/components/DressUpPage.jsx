@@ -36,7 +36,7 @@ export default function DressUpPage() {
         </div>
         <div className="du-points">
           <span className="hint">보유 포인트</span>
-          <div className="points-big">🪙 {points}P</div>
+          <div className="points-big">{points}P</div>
           <span className="hint">바른 자세 1분 = 1P</span>
         </div>
       </div>

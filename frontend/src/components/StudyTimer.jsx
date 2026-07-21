@@ -60,7 +60,7 @@ export default function StudyTimer() {
       )}
       <div className="sh-chips">
         <span className="sh-chip">바른자세 <b>{ratio != null ? ratio + "%" : "-"}</b></span>
-        <span className="sh-chip">🔥 <b>{streak}일</b> 연속</span>
+        <span className="sh-chip">연속 <b>{streak}일</b></span>
       </div>
     </section>
   );

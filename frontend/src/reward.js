@@ -114,7 +114,7 @@ export class Rewards {
   buy(itemId) {
     const item = SHOP.find((i) => i.id === itemId);
     if (!item) return { ok: false, msg: "없는 상품" };
-    if (item.soon) return { ok: false, msg: "곧 나와요! 조금만 기다려주세요 ✨" };
+    if (item.soon) return { ok: false, msg: "곧 나와요, 조금만 기다려주세요" };
     if (this.shop.owned.includes(itemId)) return { ok: false, msg: "이미 보유 중" };
     if (this.points < item.price) return { ok: false, msg: `포인트 부족 (${item.price}P 필요)` };
     this.points -= item.price;

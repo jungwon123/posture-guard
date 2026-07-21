@@ -10,9 +10,9 @@ export default function Header() {
       <span id="state-pill">준비 중</span>
       {/* 점수(0~100)는 공부방 히어로의 '바른자세 %'·상태 칩으로 이미 보여줘 헤더에선 숨김(엔진 갱신 대상이라 DOM은 유지) */}
       <span id="score" style={{ display: "none" }}>score --</span>
-      <span id="points">🪙 0P</span>
-      <span id="blink" style={{ display: "none" }}>👁 --</span>
-      <button id="theme-toggle" title="배경 밝게/어둡게">🌙</button>
+      <span id="points">0P</span>
+      <span id="blink" style={{ display: "none" }}>--</span>
+      <button id="theme-toggle" title="배경 밝게/어둡게">라이트</button>
     </header>
   );
 }
