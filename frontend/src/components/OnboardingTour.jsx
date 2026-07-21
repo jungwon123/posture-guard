@@ -1,7 +1,7 @@
 // 첫 사용 온보딩 투어 — 로그인·닉네임 게이트 통과 후 기기당 1회(pg_onboard_done).
 // 슬라이드 = HTML 타이틀(가독 크기) + 일러스트 크롭(assets/onboarding/art-N.webp).
 // 스와이프/탭 진행 + [다음]/[시작하기] + 건너뛰기.
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const DONE_KEY = "pg_onboard_done";
 
@@ -17,6 +17,13 @@ export default function OnboardingTour() {
   const [step, setStep] = useState(0);
   const [drag, setDrag] = useState(0); // 드래그 중 x 오프셋(px)
   const startX = useRef(null);
+
+  // 설정 > 온보딩 다시 보기 — 완료 후에도 이벤트로 재오픈
+  useEffect(() => {
+    const show = () => { setStep(0); setOpen(true); };
+    window.addEventListener("pg-show-onboarding", show);
+    return () => window.removeEventListener("pg-show-onboarding", show);
+  }, []);
 
   if (!open) return null;
 
