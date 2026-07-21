@@ -89,6 +89,7 @@ export default function App() {
         <AttendanceCard />
         <SettingsPanel />
         <EyeCarePanel />
+        <FairyCard />
         <DataCard />
       </div>
 
@@ -144,6 +145,40 @@ function DataCard() {
       <h2>데이터 관리</h2>
       <p className="hint">공부 시간이 실제와 다르게 기록됐다면 오늘 기록만 초기화할 수 있어요. 포인트·요정·출석은 유지됩니다.</p>
       <button type="button" onClick={resetToday}>오늘 공부 기록 초기화</button>
+    </div>
+  );
+}
+
+// 요정 도우미 — 숨긴 요정 복구 + 드래그로 고정한 위치 풀기
+function FairyCard() {
+  const [off, setOff] = useState(() => localStorage.getItem("pg_buddy_off") === "1");
+  const [pinned, setPinned] = useState(() => !!localStorage.getItem("pg_buddy_pos"));
+  // 요정 쪽(X 버튼·드래그)에서 바뀐 상태를 따라감
+  useEffect(() => {
+    const id = setInterval(() => {
+      setOff(localStorage.getItem("pg_buddy_off") === "1");
+      setPinned(!!localStorage.getItem("pg_buddy_pos"));
+    }, 1000);
+    return () => clearInterval(id);
+  }, []);
+  const toggle = () => {
+    if (off) localStorage.removeItem("pg_buddy_off");
+    else localStorage.setItem("pg_buddy_off", "1");
+    setOff(!off);
+  };
+  const resetPos = () => { localStorage.removeItem("pg_buddy_pos"); setPinned(false); };
+  return (
+    <div className="card">
+      <h2>요정 도우미</h2>
+      <p className="hint">
+        {off
+          ? "요정이 숨어 있어요. 다시 부르면 화면을 돌아다니며 자세를 봐줘요."
+          : "화면 속 요정을 끌어서 원하는 자리에 둘 수 있어요. 요정의 X 버튼으로 숨길 수 있어요."}
+      </p>
+      <div className="row" style={{ display: "flex", gap: 8 }}>
+        <button type="button" onClick={toggle}>{off ? "요정 다시 부르기" : "요정 숨기기"}</button>
+        {!off && pinned && <button type="button" onClick={resetPos}>위치 초기화</button>}
+      </div>
     </div>
   );
 }

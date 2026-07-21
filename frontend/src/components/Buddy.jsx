@@ -69,7 +69,31 @@ export default function Buddy() {
   const pinRef = useRef(loadPin());    // 사용자가 직접 놓은 자리 — 있으면 자동 이동(로밍·무대) 중지
   const dragRef = useRef(null);        // { dx, dy } 포인터-요정 오프셋
 
-  useEffect(() => { const id = setInterval(() => setDir(skinDir()), 2000); return () => clearInterval(id); }, []);
+  useEffect(() => {
+    const id = setInterval(() => {
+      setDir(skinDir());
+      // 설정 페이지에서 요정 숨김/위치 초기화를 바꾸면 리로드 없이 반영
+      const off = localStorage.getItem("pg_buddy_off") === "1";
+      setHidden(off);
+      if (!localStorage.getItem("pg_buddy_pos") && pinRef.current) pinRef.current = null;
+      // 자가 치유: 어떤 이유로든 위치가 화면 밖이면 고정 자리(없으면 기본 자리)로 복귀
+      // (뷰포트가 아직 0인 순간 — 백그라운드 탭 복원 등 — 에는 계산이 오염되므로 스킵)
+      if (!off && innerWidth > 100 && innerHeight > 100) {
+        const B = 78;
+        setPos((p) => {
+          const ok = p.left >= 0 && p.top >= 0 && p.left <= innerWidth - B && p.top <= innerHeight - B;
+          if (ok) return p;
+          const pin = loadPin();
+          const np = pin
+            ? { left: Math.min(Math.max(pin.left, 0), innerWidth - B), top: Math.min(Math.max(pin.top, 0), innerHeight - B) }
+            : { left: Math.max(0, (innerWidth - 430) / 2) + 56, top: 120 };
+          posRef.current = np;
+          return np;
+        });
+      }
+    }, 2000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     if (hidden) return;
