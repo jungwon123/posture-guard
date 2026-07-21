@@ -2,7 +2,7 @@
 // 계정 필수(게스트 없음): 이메일 로그인/회원가입 + 구글. 통계·포인트는 서버가 원본.
 // 가입/첫 구글 로그인은 needsNickname과 함께 와서 닉네임 온보딩(OnboardingNickname)으로 이어진다.
 import { useEffect, useRef, useState } from "react";
-import { apiLogin, apiRegister, apiGoogleLogin, setAuth, restoreData, GOOGLE_CLIENT_ID } from "../sync.js";
+import { apiLogin, apiRegister, apiGoogleLogin, setAuth, restoreData, wipeLocalData, GOOGLE_CLIENT_ID } from "../sync.js";
 
 const GSI_SRC = "https://accounts.google.com/gsi/client";
 
@@ -31,8 +31,9 @@ export default function LoginPage() {
         let memberId = localStorage.getItem("pg_member_id");
         if (!memberId) { memberId = crypto.randomUUID(); localStorage.setItem("pg_member_id", memberId); }
         const r = await apiGoogleLogin(resp.credential, memberId);
+        // 이 기기에 남아 있던 이전 사용자/과거 데이터 제거 — 로컬은 '현재 계정의 캐시'로만 유지
+        wipeLocalData();
         setAuth(r.token, r.nickname, r.needsNickname); // 첫 로그인이면 닉네임 온보딩으로
-
         if (r.memberId) localStorage.setItem("pg_member_id", r.memberId); // 서버 ID 채택(기기 간 통일)
         if (r.data) restoreData(r.data); // 서버 백업을 로컬로 복원(포인트·요정·출석)
         location.reload(); // 엔진·React가 복원된 데이터로 다시 부팅
@@ -94,8 +95,9 @@ export default function LoginPage() {
         r = await apiRegister(em, password, memberId);
       } else {
         r = await apiLogin(em, password);
-        if (r.data) restoreData(r.data); // 서버 백업을 로컬로 복원(포인트·요정·출석)
       }
+      wipeLocalData(); // 이 기기에 남아 있던 이전 사용자/과거 데이터 제거 — 서버 백업이 원본
+      if (r.data) restoreData(r.data); // 그 다음 서버 백업을 로컬로 복원(포인트·요정·출석)
       setAuth(r.token, r.nickname || "", r.needsNickname); // 가입이면 닉네임 온보딩으로
       if (r.memberId) localStorage.setItem("pg_member_id", r.memberId); // 서버 ID 채택(기기 간 통일)
       location.reload(); // 엔진·React가 복원된 데이터로 다시 부팅
