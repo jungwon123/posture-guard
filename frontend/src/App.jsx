@@ -7,6 +7,7 @@ import Controls from "./components/Controls.jsx";
 import AttendanceCard from "./components/AttendanceCard.jsx";
 import PostureChart from "./components/PostureChart.jsx";
 import CalendarCard from "./components/CalendarCard.jsx";
+import { localDateStr, resetDailyOnServer } from "./sync.js";
 import SettingsPanel from "./components/SettingsPanel.jsx";
 import EyeCarePanel from "./components/EyeCarePanel.jsx";
 import GroupPanel from "./components/GroupPanel.jsx";
@@ -88,6 +89,7 @@ export default function App() {
         <AttendanceCard />
         <SettingsPanel />
         <EyeCarePanel />
+        <DataCard />
       </div>
 
       {/* 통계 시트 — [통계] 버튼으로 열리는 차트·기록. 항상 마운트(display 토글)해 데이터 갱신 유지 */}
@@ -114,5 +116,34 @@ export default function App() {
         </div>
       )}
     </>
+  );
+}
+
+// 데이터 관리 — 오늘 공부 기록 초기화 (잘못 부풀어 기록된 날 복구용. 포인트·요정·출석은 유지)
+function DataCard() {
+  const resetToday = async () => {
+    if (!confirm("오늘 공부 기록을 초기화할까요?\n(포인트·요정·출석은 그대로 유지됩니다)")) return;
+    const d = new Date(); d.setHours(0, 0, 0, 0);
+    const t0 = d.getTime() / 1000;
+    let ev = [];
+    try { ev = JSON.parse(localStorage.getItem("pg_events") || "[]").filter((e) => e.t < t0); } catch {}
+    // 자정 이전에서 넘어온 열린 세그먼트가 오늘로 다시 새지 않게 자정에 AWAY로 봉인
+    const last = ev[ev.length - 1];
+    if (last && last.to !== "AWAY") ev.push({ t: t0, from: last.to, to: "AWAY" });
+    localStorage.setItem("pg_events", JSON.stringify(ev));
+    try {
+      const daily = JSON.parse(localStorage.getItem("pg_daily") || "{}");
+      delete daily[localDateStr()];
+      localStorage.setItem("pg_daily", JSON.stringify(daily));
+    } catch {}
+    await resetDailyOnServer(localDateStr()); // 로그인 상태면 서버 캘린더 기록도 0으로
+    location.reload();
+  };
+  return (
+    <div className="card">
+      <h2>데이터 관리</h2>
+      <p className="hint">공부 시간이 실제와 다르게 기록됐다면 오늘 기록만 초기화할 수 있어요. 포인트·요정·출석은 유지됩니다.</p>
+      <button type="button" onClick={resetToday}>오늘 공부 기록 초기화</button>
+    </div>
   );
 }

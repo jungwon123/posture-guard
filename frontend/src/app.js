@@ -116,6 +116,16 @@ let lastActivePersist = 0;
 const IDLE_GAP_SEC = 5;  // 틱 공백이 이보다 크면 백그라운드/절전 복귀로 보고 직전 세그먼트를 그 시점에 끊음.
 let lastResult = null;
 let events = store.loadEvents();
+// 부팅 복구 — 측정 중 앱이 꺼지면(새로고침·강제종료) 마지막 GOOD/CAUTION/BAD 세그먼트가 열린 채 남고,
+// 카메라를 다시 안 켜면 타이머·차트가 벽시계 시간만큼 부풀어 보인다(예: 13시간).
+// 마지막 실제 감지 시각(pg_last_active)에서 AWAY로 닫아 영구 수리한다.
+(() => {
+  const last = events[events.length - 1];
+  if (!last || !["GOOD", "CAUTION", "BAD"].includes(last.to)) return;
+  const now = nowSec();
+  const cut = Math.max(last.t, Math.min(lastActiveSec || last.t, now));
+  if (now - cut > IDLE_GAP_SEC) { events.push({ t: cut, from: last.to, to: "AWAY" }); store.saveEvents(events); }
+})();
 
 // ── 눈 깜빡임 — 주기 샘플링. 얼굴 모델은 머리자세 판정용으로 이미 로드돼 있어 추가 비용 0, 샘플 창에서만 카운트 ──
 const BLINK_WINDOW_SEC = 30;    // 한 번 잴 때 30초 측정
@@ -388,7 +398,7 @@ async function start() {
 function stop() {
   writeDailySnapshot(computeReport(events, dayStartSec(), nowSec())); // 오늘 일별 집계 스냅샷(캘린더)
   // 열린 GOOD/BAD 세그먼트를 지금 시점에 닫아, 정지 후에도 시간이 계속 누적되지 않게 함.
-  if (running && (sm.state === "GOOD" || sm.state === "BAD")) { logTransition(sm.state, "AWAY", nowSec()); sm.state = "AWAY"; }
+  if (running && ["GOOD", "CAUTION", "BAD"].includes(sm.state)) { logTransition(sm.state, "AWAY", nowSec()); sm.state = "AWAY"; }
   running = false;
   uploadStats(); // 세그먼트 닫힌 뒤 최종 집계 1회
   window.__pgLive = { running: false }; // 도우미에게 카메라 꺼짐 알림
@@ -610,7 +620,7 @@ function tick() {
     lastDetect = wallMs;
     // 감지 공백(백그라운드·절전 복귀 등) → 직전 GOOD/BAD 세그먼트를 공백 시작점에서 끊어 유휴시간을 GOOD로 안 셈
     if (lastActiveSec && now - lastActiveSec > IDLE_GAP_SEC) {
-      if (sm.state === "GOOD" || sm.state === "BAD") logTransition(sm.state, "AWAY", lastActiveSec);
+      if (["GOOD", "CAUTION", "BAD"].includes(sm.state)) logTransition(sm.state, "AWAY", lastActiveSec);
       sm.state = "AWAY";
     }
     lastActiveSec = now;

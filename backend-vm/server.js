@@ -406,6 +406,7 @@ app.post("/api/daily", async (req, res) => {
   if (!a.rows.length) return bad(res, 401, "다시 로그인해주세요");
   const days = (Array.isArray(req.body?.days) ? req.body.days.slice(0, 40) : [])
     .filter((d) => isDate(d?.date));
+  const overwrite = req.body?.overwrite === true; // 초기화용 — GREATEST 병합 대신 그대로 덮어쓰기
   if (days.length) {
     // 루프 INSERT(요청당 최대 40쿼리) 대신 multi-row upsert 한 방
     const params = [a.rows[0].id];
@@ -419,12 +420,12 @@ app.post("/api/daily", async (req, res) => {
       `INSERT INTO daily_stats (account_id, date, watched_sec, good_sec, caution_sec, bad_sec, bad_count, longest_good_sec)
        VALUES ${rows.join(", ")}
        ON CONFLICT (account_id, date) DO UPDATE SET
-         watched_sec = GREATEST(daily_stats.watched_sec, EXCLUDED.watched_sec),
-         good_sec = GREATEST(daily_stats.good_sec, EXCLUDED.good_sec),
-         caution_sec = GREATEST(daily_stats.caution_sec, EXCLUDED.caution_sec),
-         bad_sec = GREATEST(daily_stats.bad_sec, EXCLUDED.bad_sec),
-         bad_count = GREATEST(daily_stats.bad_count, EXCLUDED.bad_count),
-         longest_good_sec = GREATEST(daily_stats.longest_good_sec, EXCLUDED.longest_good_sec),
+         watched_sec = ${overwrite ? "EXCLUDED.watched_sec" : "GREATEST(daily_stats.watched_sec, EXCLUDED.watched_sec)"},
+         good_sec = ${overwrite ? "EXCLUDED.good_sec" : "GREATEST(daily_stats.good_sec, EXCLUDED.good_sec)"},
+         caution_sec = ${overwrite ? "EXCLUDED.caution_sec" : "GREATEST(daily_stats.caution_sec, EXCLUDED.caution_sec)"},
+         bad_sec = ${overwrite ? "EXCLUDED.bad_sec" : "GREATEST(daily_stats.bad_sec, EXCLUDED.bad_sec)"},
+         bad_count = ${overwrite ? "EXCLUDED.bad_count" : "GREATEST(daily_stats.bad_count, EXCLUDED.bad_count)"},
+         longest_good_sec = ${overwrite ? "EXCLUDED.longest_good_sec" : "GREATEST(daily_stats.longest_good_sec, EXCLUDED.longest_good_sec)"},
          updated_at = now()`, params);
   }
   return res.json({ ok: true, saved: days.length });

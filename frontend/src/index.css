@@ -789,7 +789,9 @@
 
 /* ── 돌아다니는 요정 도우미 (Buddy) ── */
 .buddy { position: fixed; z-index: 55; width: 78px; height: 78px;
-  transition: left 1.1s cubic-bezier(.34,0,.2,1), top 1.1s cubic-bezier(.34,0,.2,1); }
+  transition: left 1.1s cubic-bezier(.34,0,.2,1), top 1.1s cubic-bezier(.34,0,.2,1);
+  touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; }
+.buddy.dragging { transition: none; cursor: grabbing; }
 .buddy-img { width: 78px; height: 78px; object-fit: contain; image-rendering: pixelated; display: block;
   filter: drop-shadow(0 5px 9px rgba(12, 16, 24,.4)); animation: buddy-bob 3s ease-in-out infinite; }
 @keyframes buddy-bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }

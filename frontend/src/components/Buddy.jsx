@@ -50,13 +50,24 @@ function sparkleTrail(from, to) {
   requestAnimationFrame(step);
 }
 
+const loadPin = () => { try { return JSON.parse(localStorage.getItem("pg_buddy_pos") || "null"); } catch { return null; } };
+
 export default function Buddy() {
   const [hidden, setHidden] = useState(() => localStorage.getItem("pg_buddy_off") === "1");
-  // 초기 위치도 폰 컬럼(PC=중앙 430px, 모바일=전체) 안으로 잡아 마운트 직후 깜빡임 방지
-  const [pos, setPos] = useState(() => ({ left: Math.max(0, (window.innerWidth - 430) / 2) + 56, top: 120 }));
+  // 초기 위치: 사용자가 끌어다 둔 자리(pin)가 있으면 거기, 없으면 폰 컬럼 안 기본 자리
+  const [pos, setPos] = useState(() => {
+    const pin = loadPin();
+    const B = 78;
+    if (pin) return { left: Math.min(Math.max(pin.left, 0), innerWidth - B), top: Math.min(Math.max(pin.top, 0), innerHeight - B) };
+    return { left: Math.max(0, (window.innerWidth - 430) / 2) + 56, top: 120 };
+  });
   const [anim, setAnim] = useState("idle");
   const [dir, setDir] = useState(skinDir);
+  const [dragging, setDragging] = useState(false);
   const R = useRef({ state: null, worst: null, lastSpeak: 0, lastMove: 0, bubbleUntil: 0 });
+  const posRef = useRef(pos);          // 드래그·말풍선 배치가 공유하는 현재 위치
+  const pinRef = useRef(loadPin());    // 사용자가 직접 놓은 자리 — 있으면 자동 이동(로밍·무대) 중지
+  const dragRef = useRef(null);        // { dx, dy } 포인터-요정 오프셋
 
   useEffect(() => { const id = setInterval(() => setDir(skinDir()), 2000); return () => clearInterval(id); }, []);
 
@@ -69,15 +80,17 @@ export default function Buddy() {
     wrap.appendChild(bub); document.body.appendChild(wrap);
 
     const B = 78;
-    let cur = { left: 60, top: 120 };
     const placeBubble = () => {
+      const cur = posRef.current;
       const w = bub.offsetWidth || 150;
       wrap.style.left = Math.round(Math.min(Math.max(cur.left + B / 2 - w / 2, 6), innerWidth - w - 6)) + "px";
-      wrap.style.top = (cur.top + B + 12) + "px";
+      // 화면 하단에 고정해 두면 말풍선이 잘리므로 위쪽으로 뒤집기
+      wrap.style.top = (cur.top + B + 12 + 40 > innerHeight ? cur.top - 40 : cur.top + B + 12) + "px";
     };
     const showBubble = (t) => { bub.textContent = t; wrap.style.display = "block"; placeBubble(); };
     const hideBubble = () => { wrap.style.display = "none"; };
-    const setBoth = (p) => { const from = cur; cur = p; setPos(p); if (wrap.style.display !== "none") placeBubble(); R.current.lastMove = performance.now(); sparkleTrail(from, p); };
+    wrap.__place = placeBubble; // 드래그 핸들러(이펙트 밖)가 말풍선을 따라오게 할 훅
+    const setBoth = (p) => { const from = posRef.current; posRef.current = p; setPos(p); if (wrap.style.display !== "none") placeBubble(); R.current.lastMove = performance.now(); sparkleTrail(from, p); };
 
     // PC에서는 앱이 폰 폭(430px) 중앙 컬럼으로 보이므로, 도우미도 그 컬럼 안에서만 로밍
     const FRAME = 430;
@@ -88,9 +101,10 @@ export default function Buddy() {
       { left: x0 + 56, top: Math.round(h * 0.4) }, { left: x0 + w - B - 56, top: Math.round(h * 0.4) },
       { left: x0 + 56, top: h - 250 }, { left: x0 + w - B - 56, top: h - 250 },
     ]; };
-    const roam = () => setBoth(perches()[Math.floor(Math.random() * 6)]);
+    // 사용자가 직접 놓은 자리(pin)가 있으면 요정이 마음대로 안 움직인다 — 로밍·무대이동 모두 스킵
+    const roam = () => { if (!pinRef.current) setBoth(perches()[Math.floor(Math.random() * 6)]); };
     // 말할 때 서는 '무대' — 카메라 <video> 위에 말풍선이 가려지므로(비디오 오버레이) 비디오 없는 하단 중앙으로
-    const stageSpot = () => setBoth({ left: Math.round(fx() + fw() / 2 - B / 2), top: Math.max(120, innerHeight - 240) });
+    const stageSpot = () => { if (!pinRef.current) setBoth({ left: Math.round(fx() + fw() / 2 - B / 2), top: Math.max(120, innerHeight - 240) }); };
     const say = (t, ms = 4600) => { stageSpot(); showBubble(t); R.current.bubbleUntil = performance.now() + ms; R.current.lastSpeak = performance.now(); };
 
     roam();
@@ -120,10 +134,36 @@ export default function Buddy() {
     return () => { clearInterval(id); wrap.remove(); };
   }, [hidden]); // eslint-disable-line
 
+  // 드래그로 요정 옮기기 — 놓은 자리는 저장되고, 그 뒤로는 요정이 스스로 안 움직인다(콘텐츠 가림 방지)
+  const onPointerDown = (e) => {
+    if (e.target.closest(".buddy-x")) return;
+    e.preventDefault(); // 드래그 중 페이지 텍스트 선택 방지
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    dragRef.current = { dx: e.clientX - posRef.current.left, dy: e.clientY - posRef.current.top };
+    setDragging(true);
+  };
+  const onPointerMove = (e) => {
+    if (!dragRef.current) return;
+    const B = 78;
+    const p = {
+      left: Math.min(Math.max(e.clientX - dragRef.current.dx, 0), innerWidth - B),
+      top: Math.min(Math.max(e.clientY - dragRef.current.dy, 0), innerHeight - B),
+    };
+    posRef.current = p; setPos(p);
+    document.querySelector(".buddy-bubble-wrap")?.__place?.(); // 말풍선 따라오기
+  };
+  const onPointerUp = () => {
+    if (!dragRef.current) return;
+    dragRef.current = null; setDragging(false);
+    pinRef.current = posRef.current;
+    localStorage.setItem("pg_buddy_pos", JSON.stringify(posRef.current));
+  };
+
   if (hidden) return null;
   return (
-    <div className="buddy" style={{ left: pos.left, top: pos.top }}>
-      <img className="buddy-img" src={`/${dir}/${anim}.gif`} alt="요정 도우미"
+    <div className={`buddy${dragging ? " dragging" : ""}`} style={{ left: pos.left, top: pos.top }}
+      onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp}>
+      <img className="buddy-img" src={`/${dir}/${anim}.gif`} alt="요정 도우미" draggable={false}
         onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = "/assets/fairy/idle.gif"; }} />
       <button className="buddy-x" onClick={() => { localStorage.setItem("pg_buddy_off", "1"); setHidden(true); }} title="도우미 숨기기">✕</button>
     </div>

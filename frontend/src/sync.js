@@ -178,3 +178,13 @@ export async function pullDailyRange(from, to) {
   } catch (e) { dropAuthIf401(e); }
   return all;
 }
+
+// 오늘 서버 기록 0으로 덮어쓰기(초기화 버튼용) — GREATEST 병합을 우회하는 overwrite 플래그 사용.
+export async function resetDailyOnServer(dateKey) {
+  const auth = getAuth();
+  if (!auth) return;
+  try {
+    await post("daily", { token: auth.token, overwrite: true,
+      days: [{ date: dateKey, watched: 0, good: 0, caution: 0, bad: 0, badCount: 0, longestGood: 0 }] });
+  } catch (e) { dropAuthIf401(e); }
+}
