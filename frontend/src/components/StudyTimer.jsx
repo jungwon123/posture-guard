@@ -23,6 +23,18 @@ function readStreak() {
   return n;
 }
 
+// 숫자가 바뀌는 자리만 굴러 올라오는 롤링 디지트 — key에 값을 넣어 변경 시 리마운트→CSS 애니 재생.
+// 반드시 모듈 스코프에 정의: 컴포넌트 안에서 정의하면 매 리렌더마다 새 타입이 돼
+// 시계 전체가 리마운트되면서 안 바뀐 숫자까지 매초 애니메이션이 재생된다.
+const RollingClock = ({ text }) => (
+  <span className="sh-clock">
+    {text.split("").map((ch, i) =>
+      /\d/.test(ch)
+        ? <span key={`${i}-${ch}`} className="sh-digit">{ch}</span>
+        : <span key={`s${i}`} className="sh-sep">{ch}</span>)}
+  </span>
+);
+
 export default function StudyTimer() {
   const [, setTick] = useState(0);
   useEffect(() => {
@@ -32,16 +44,6 @@ export default function StudyTimer() {
 
   let events = [];
   try { events = JSON.parse(localStorage.getItem("pg_events") || "[]"); } catch {}
-
-  // 숫자가 바뀌는 자리만 굴러 올라오는 롤링 디지트 — key에 값을 넣어 변경 시 리마운트→CSS 애니 재생
-  const RollingClock = ({ text }) => (
-    <span className="sh-clock">
-      {text.split("").map((ch, i) =>
-        /\d/.test(ch)
-          ? <span key={`${i}-${ch}`} className="sh-digit">{ch}</span>
-          : <span key={`s${i}`} className="sh-sep">{ch}</span>)}
-    </span>
-  );
   const rep = computeReport(events, dayStartSec(), nowSec());
   const live = (typeof window !== "undefined" && window.__pgLive) || {};
   // 이번 세션 공부시간 = 세션 시작 이후 watched(자리 지키며 공부). 종료하면 사라짐.
