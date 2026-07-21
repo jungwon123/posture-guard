@@ -15,6 +15,7 @@ import GroupGrid from "./components/GroupGrid.jsx";
 import DressUpPage from "./components/DressUpPage.jsx";
 import LoginPage from "./components/LoginPage.jsx";
 import OnboardingNickname from "./components/OnboardingNickname.jsx";
+import OnboardingTour from "./components/OnboardingTour.jsx";
 import ReportOverlay from "./components/ReportOverlay.jsx";
 import InstallBanner from "./components/InstallBanner.jsx";
 import BottomNav from "./components/BottomNav.jsx";
@@ -112,6 +113,9 @@ export default function App() {
       <InstallBanner />
       <Buddy />
       <BottomNav page={page} onChange={setPage} />
+
+      {/* 게이트 통과 후 기기당 1회 온보딩 투어(표시 여부는 컴포넌트가 pg_onboard_done으로 판단) */}
+      {auth && !auth.needsNickname && <OnboardingTour />}
 
       {/* 게이트 — ① 미로그인 → 로그인 ② 닉네임 미설정(needsNickname) → 온보딩 ③ 통과.
           기존 사용자는 pg_auth에 needsNickname이 없어(undefined=falsy) 온보딩을 건너뛴다.

@@ -391,6 +391,45 @@
 }
 @media (min-width: 600px) { .login-gate { max-width: 430px; margin-inline: auto; } }
 
+/* ── 온보딩 투어 (첫 사용 1회) — 로그인 게이트와 같은 숲 스크림 위 카드 스와이프 ── */
+.onboard-gate {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+  padding: 20px; user-select: none; -webkit-user-select: none;
+  background:
+    linear-gradient(rgba(16, 20, 24,.80), rgba(16, 20, 24,.93)),
+    url("/assets/ui/forest-bg.png") center / cover no-repeat;
+}
+:root[data-theme="light"] .onboard-gate {
+  background:
+    linear-gradient(rgba(250, 250, 252,.72), rgba(250, 250, 252,.90)),
+    url("/assets/ui/forest-bg.png") center / cover no-repeat;
+}
+@media (min-width: 600px) { .onboard-gate { max-width: 430px; margin-inline: auto; } }
+.onboard-skip {
+  position: absolute; top: 14px; right: 14px;
+  border: 0; background: none; padding: 8px 12px; cursor: pointer;
+  color: var(--muted); font-size: 14px;
+}
+.onboard-frame {
+  aspect-ratio: 348 / 1086;
+  height: calc(100dvh - 190px); max-height: 680px;
+  overflow: hidden; border-radius: 22px; touch-action: none;
+  box-shadow: 0 10px 30px rgba(12, 16, 24,.35);
+}
+.onboard-track { display: flex; height: 100%; }
+.onboard-card {
+  flex: 0 0 100%; width: 100%; height: 100%; object-fit: cover;
+  -webkit-user-drag: none; pointer-events: none;
+}
+.onboard-next {
+  width: min(300px, 78vw); padding: 14px 22px;
+  border: 0; border-radius: 20px; cursor: pointer;
+  background: url("/assets/ui/btn-frame-wide.png") center / 100% 100% no-repeat, var(--accent);
+  color: #101418; font-weight: 700; font-size: 16px;
+}
+.onboard-next:active { transform: scale(.98); }
+
 /* ── 요정 UI 에셋 (숲 배경 · 페이지 배너 · 버튼) ── */
 #app-bg {
   position: fixed; inset: 0; z-index: -1; pointer-events: none;
