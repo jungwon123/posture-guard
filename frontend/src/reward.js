@@ -49,19 +49,20 @@ export const TIERS = [
   { id: "premium", label: "프리미엄", sub: "단 하나뿐인 빛" },
 ];
 
+// 테스트 기간 한정 전 상품 0P 개방 — 원가: 파랑500/노랑700/핑크900, 달빛2000/크리스탈2500/숲3000, 딸기8000/바다10000/아이돌12000
 export const SHOP = [
   // 레어
-  { id: "skin_blue",   type: "skin", key: "blue",   label: "파랑 요정", tier: "rare", price: 500 },
-  { id: "skin_yellow", type: "skin", key: "yellow", label: "노랑 요정", tier: "rare", price: 700 },
-  { id: "skin_pink",   type: "skin", key: "pink",   label: "핑크 요정", tier: "rare", price: 900 },
+  { id: "skin_blue",   type: "skin", key: "blue",   label: "파랑 요정", tier: "rare", price: 0 },
+  { id: "skin_yellow", type: "skin", key: "yellow", label: "노랑 요정", tier: "rare", price: 0 },
+  { id: "skin_pink",   type: "skin", key: "pink",   label: "핑크 요정", tier: "rare", price: 0 },
   // 에픽
-  { id: "skin_moonlight", type: "skin", key: "moonlight", label: "달빛 요정",   tier: "epic", price: 2000 },
-  { id: "skin_crystal",   type: "skin", key: "crystal",   label: "크리스탈 요정", tier: "epic", price: 2500 },
-  { id: "skin_forest",    type: "skin", key: "forest",    label: "숲 요정",     tier: "epic", price: 3000 },
+  { id: "skin_moonlight", type: "skin", key: "moonlight", label: "달빛 요정",   tier: "epic", price: 0 },
+  { id: "skin_crystal",   type: "skin", key: "crystal",   label: "크리스탈 요정", tier: "epic", price: 0 },
+  { id: "skin_forest",    type: "skin", key: "forest",    label: "숲 요정",     tier: "epic", price: 0 },
   // 프리미엄
-  { id: "skin_strawberry", type: "skin", key: "strawberry", label: "딸기 디저트 요정", tier: "premium", price: 8000 },
-  { id: "skin_ocean",      type: "skin", key: "ocean",      label: "바다 요정",       tier: "premium", price: 10000 },
-  { id: "skin_idol",       type: "skin", key: "idol",       label: "아이돌 요정",     tier: "premium", price: 12000 },
+  { id: "skin_strawberry", type: "skin", key: "strawberry", label: "딸기 디저트 요정", tier: "premium", price: 0 },
+  { id: "skin_ocean",      type: "skin", key: "ocean",      label: "바다 요정",       tier: "premium", price: 0 },
+  { id: "skin_idol",       type: "skin", key: "idol",       label: "아이돌 요정",     tier: "premium", price: 0 },
 ];
 
 export const DEFAULT_SETTINGS = {
