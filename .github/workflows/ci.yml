@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [realtime-camera]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  frontend:
+    name: 프론트 테스트·빌드
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: 유닛 테스트 (판정·과목·홍채·논문반영)
+        run: |
+          for f in test/*.mjs; do
+            echo "== $f"
+            node "$f"
+          done
+      - name: 프로덕션 빌드
+        run: npm run build
+
+  backend:
+    name: 백엔드 문법·의존성
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: 문법 검사
+        run: |
+          node --check backend-vm/server.js
+          node --check backend-vm/signaling.js
+      - name: 의존성 설치 검증
+        run: cd backend-vm && npm install --omit=dev --ignore-scripts

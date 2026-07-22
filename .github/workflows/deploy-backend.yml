@@ -1,0 +1,32 @@
+name: Deploy backend
+
+on:
+  push:
+    branches: [realtime-camera]
+    paths: ['backend-vm/**', 'infra/**']
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: VM 컨테이너 재배포
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: SSH 키 준비
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H 34.64.158.222 >> ~/.ssh/known_hosts 2>/dev/null
+      - name: 코드 동기화 (rsync — .env는 건드리지 않음)
+        run: rsync -az --delete --exclude '.env' backend-vm infra jwon@34.64.158.222:~/stack/
+      - name: 컨테이너 재빌드·기동 + 내부 헬스체크
+        run: |
+          ssh jwon@34.64.158.222 \
+            'cd ~/stack/infra && sudo docker compose build api && sudo docker compose up -d --remove-orphans && sleep 4 && curl -sf localhost:8080/api/health'
+      - name: 외부 헬스체크 (TLS 경유)
+        run: curl -sf https://34-64-158-222.sslip.io/api/health

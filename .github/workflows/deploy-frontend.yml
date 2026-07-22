@@ -1,0 +1,31 @@
+name: Deploy frontend (Vercel)
+
+on:
+  push:
+    branches: [realtime-camera]
+    paths: ['frontend/**']
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Vercel 프로덕션 배포
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_ORG_ID: team_TiwXcPSyI7dNY4otv8dPNsRp
+      VERCEL_PROJECT_ID: prj_VePHh0gjzCUJlNGDrfWwlKL5UpE6
+    steps:
+      - uses: actions/checkout@v4
+      - name: 토큰 확인
+        id: tok
+        run: echo "has=${{ secrets.VERCEL_TOKEN != '' }}" >> "$GITHUB_OUTPUT"
+      - name: 토큰 없으면 건너뜀
+        if: steps.tok.outputs.has != 'true'
+        run: echo "VERCEL_TOKEN 시크릿이 없어 배포를 건너뜁니다 — Vercel 대시보드에서 토큰 발급 후 gh secret set VERCEL_TOKEN"
+      - uses: actions/setup-node@v4
+        if: steps.tok.outputs.has == 'true'
+        with:
+          node-version: 22
+      - name: Vercel 배포
+        if: steps.tok.outputs.has == 'true'
+        working-directory: frontend
+        run: npx vercel deploy --prod --yes --token "${{ secrets.VERCEL_TOKEN }}"
