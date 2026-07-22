@@ -607,6 +607,7 @@ async function start() {
   els.btnCalib.disabled = false;
   els.btnCalib.textContent = hasBaseline() ? "기준 다시 잡기" : (camMode === "side" ? "측면 기준 등록 (5초)" : "바른자세 기준 등록 (5초)");
   els.btnPip.disabled = false;
+  show($("cam-mode-live"), true); syncModeBtns(); // 측정 중 모드 전환 토글 노출
   updateOverlays(sm.state); // 시작 CTA 숨기고, 미등록이면 [기준 등록] 강조
   if (rewards.attend(dateStr())) {
     els.msg.textContent = "출석 +10P! " + (hasBaseline() ? "감지 중 (저장된 기준 사용)." : camMode === "side" ? "폰을 옆에 두고 옆모습이 보이면 [기준 등록]을 누르세요." : "평소 공부 자세로 앉은 뒤 [기준 등록]을 누르세요.");
@@ -647,6 +648,7 @@ function stop() {
   els.btnStart.classList.remove("danger");
   els.btnCalib.disabled = true;
   els.btnCalib.classList.remove("pulse");
+  show($("cam-mode-live"), false); // 정지 후엔 시작 화면(start-cta) 토글이 담당
   els.pill.textContent = "꺼짐";
   els.pill.style.background = "#555";
   els.score.textContent = "score --";
@@ -1903,27 +1905,45 @@ els.btnCalib.onclick = () => {
   speak(camMode === "side" ? "옆모습으로 바르게 앉아요" : "평소 공부 자세로, 등과 목만 곧게 펴요");
 };
 
-// ── 카메라 모드 토글 (시작 화면에서만 — 측정 중엔 start-cta가 숨어 전환 불가) ──
+// ── 카메라 모드 토글 — 시작 화면(start-cta)과 측정 중(controls 줄) 양쪽에서 동작 ──
+function syncModeBtns() {
+  for (const [m, ids] of [["front", ["mode-front", "mode-front-live"]], ["side", ["mode-side", "mode-side-live"]]])
+    ids.forEach((id) => document.getElementById(id)?.classList.toggle("on", camMode === m));
+}
 function setCamMode(mode) {
   if (mode === camMode) return;
   camMode = mode;
   localStorage.setItem("pg_cam_mode", mode);
-  document.getElementById("mode-front")?.classList.toggle("on", mode === "front");
-  document.getElementById("mode-side")?.classList.toggle("on", mode === "side");
+  syncModeBtns();
+  // 진행 중이던 기준 등록은 폐기 — 두 모드의 표본이 섞이면 기준이 오염된다
+  calibUntil = null;
+  calibSamples = []; absCalibSamples = []; guideCalibSamples = []; camCalibSamples = []; sideCalibSamples = [];
   sideSmoother = new SideSmoother(); smoother = new SignalSmoother(); absSmoother = new AbsSmoother();
   resetDrift(); lastSide = null;
-  sm = new StateMachine(); sm.state = hasBaseline() ? "GOOD" : "UNCALIBRATED";
-  els.btnCalib.textContent = hasBaseline() ? "기준 다시 잡기" : (mode === "side" ? "측면 기준 등록 (5초)" : "바른자세 기준 등록 (5초)");
-  els.msg.textContent = mode === "side"
-    ? "측면 모드(베타): 폰을 책상 옆에 두고 시작하세요. 귀-어깨 정렬로 거북목을 직접 봐요."
-    : "정면 모드로 전환했어요.";
+  const based = hasBaseline();
+  if (running) {
+    // 공부 종료 없이 전환: 열린 자세 세그먼트를 닫고, 폰을 옮기는 동안은 자리비움으로 타이머가 멈춘다
+    if (["GOOD", "CAUTION", "BAD"].includes(sm.state)) logTransition(sm.state, "AWAY", nowSec());
+    sm = new StateMachine(); sm.state = based ? "AWAY" : "UNCALIBRATED";
+    if (mode !== "side") ensureFaceModel(); // 측면으로 시작한 세션엔 얼굴 모델이 없다 — 정면 전환 시 로드
+    const move = mode === "side" ? "폰을 책상 옆으로 옮겨 주세요" : "폰을 정면으로 되돌려 주세요";
+    centerPop(`<div class="cp-title">${mode === "side" ? "측면" : "정면"} 모드로 전환했어요</div>
+      <div class="cp-sub">${move}.<br />${based ? "카메라에 보이면 이어서 측정해요" : `그 다음 [${mode === "side" ? "측면 기준 등록" : "기준 등록"}]을 눌러 주세요`}</div>`, 3400);
+    els.msg.textContent = based
+      ? `${mode === "side" ? "측면" : "정면"} 모드로 전환. ${move.replace("주세요", "주면")} 이어서 측정해요.`
+      : `${mode === "side" ? "측면" : "정면"} 모드로 전환. 폰을 옮긴 뒤 [기준 등록]으로 ${mode === "side" ? "측면" : "정면"} 기준을 잡아 주세요.`;
+  } else {
+    sm = new StateMachine(); sm.state = based ? "GOOD" : "UNCALIBRATED";
+    els.msg.textContent = mode === "side"
+      ? "측면 모드(베타): 폰을 책상 옆에 두고 시작하세요. 귀-어깨 정렬로 거북목을 직접 봐요."
+      : "정면 모드로 전환했어요.";
+  }
+  els.btnCalib.textContent = based ? "기준 다시 잡기" : (mode === "side" ? "측면 기준 등록 (5초)" : "바른자세 기준 등록 (5초)");
+  updateOverlays(sm.state); // 캘리브 오버레이 정리 + [기준 등록] 맥동 갱신
 }
-document.getElementById("mode-front")?.addEventListener("click", () => setCamMode("front"));
-document.getElementById("mode-side")?.addEventListener("click", () => setCamMode("side"));
-if (camMode === "side") {
-  document.getElementById("mode-side")?.classList.add("on");
-  document.getElementById("mode-front")?.classList.remove("on");
-}
+["mode-front", "mode-front-live"].forEach((id) => document.getElementById(id)?.addEventListener("click", () => setCamMode("front")));
+["mode-side", "mode-side-live"].forEach((id) => document.getElementById(id)?.addEventListener("click", () => setCamMode("side")));
+syncModeBtns();
 els.btnNotify.onclick = async () => {
   playNotes(MELODIES.sparkle.notes, rewards.settings.volume); // 사용자 제스처로 오디오 잠금 해제 (아이폰 필수 — 가장 먼저)
   if (typeof Notification === "undefined") {
