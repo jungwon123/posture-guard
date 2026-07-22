@@ -8,7 +8,7 @@ import {
 import { AbsSmoother, extractAbsolute, finishAbsRef, absPenalty, absDominant, headPoseFromMatrix,
   extractGuidePoints, finishGuide, projectGuide } from "./posture3d.js";
 import { Rewards, MELODIES, SKINS, SHOP, TIERS, computeReport, hurtMotion } from "./reward.js";
-import { getAuth, syncPull, mergeData, startSyncLoop, writeDailySnapshot, pushDaily, localDateStr } from "./sync.js";
+import { getAuth, syncPull, mergeData, startSyncLoop, writeDailySnapshot, pushDaily, localDateStr, recalcTodaySnapshot } from "./sync.js";
 import { computeSubjects, readSubjLog, readSubjects, writeDailySubjSnapshot } from "./subjects.js";
 
 // React 마운트 후 1회 실행 (엔진 계층 — 카메라 루프·판정·알림·PiP)
@@ -137,6 +137,22 @@ let events = store.loadEvents();
   //  카메라를 다시 켤 때까지 공부시간·바른자세%가 벽시계만큼 계속 자란다.)
   events.push({ t: cut, from: last.to, to: "AWAY" });
   store.saveEvents(events);
+})();
+
+// 오늘 스냅샷 1회 재계산(마이그레이션) — 과거 오염(역순 이벤트·유령시간) 기간에 캘린더/서버로
+// 박제된 오늘 값이 이벤트 진실과 2분 이상 다르면 재계산 값으로 교체(타이머·차트·캘린더 일치 복원).
+// 주의: 다른 기기의 오늘 기록은 그 기기가 다음 60초 push(GREATEST)에서 다시 채운다.
+(() => {
+  const FLAG = "pg_daily_recalc_v1";
+  if (localStorage.getItem(FLAG)) return;
+  localStorage.setItem(FLAG, "1");
+  try {
+    const rep = computeReport(events, dayStartSec(), nowSec());
+    const snap = JSON.parse(localStorage.getItem("pg_daily") || "{}")[localDateStr()];
+    if (snap && Math.abs((snap.watched || 0) - Math.round(rep.watched)) > 120) {
+      recalcTodaySnapshot(rep);
+    }
+  } catch {}
 })();
 
 // ── 눈 깜빡임 — 주기 샘플링. 얼굴 모델은 머리자세 판정용으로 이미 로드돼 있어 추가 비용 0, 샘플 창에서만 카운트 ──

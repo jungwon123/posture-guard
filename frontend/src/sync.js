@@ -171,6 +171,25 @@ export function writeDailySnapshot(rep) {
   saveDaily(all);
 }
 
+// 오늘 스냅샷 재계산(1회 마이그레이션) — 오염 기간에 max 병합·GREATEST로 박제된 오늘 값을
+// '이벤트 재계산 진실'로 로컬·서버 모두 교체. 라이브 표면(타이머·차트)과 캘린더·서버가 다시 일치한다.
+export async function recalcTodaySnapshot(rep) {
+  const key = localDateStr();
+  const caution = Math.max(0, (rep?.watched || 0) - (rep?.good || 0) - (rep?.bad || 0));
+  const day = {
+    watched: Math.round(rep?.watched || 0), good: Math.round(rep?.good || 0), caution: Math.round(caution),
+    bad: Math.round(rep?.bad || 0), badCount: rep?.badCount || 0, longestGood: Math.round(rep?.longestGood || 0),
+  };
+  const all = readDaily();
+  all[key] = day; // 교체 (max 병합 아님)
+  saveDaily(all);
+  localStorage.setItem("pg_daily_recalc_at", String(Date.now())); // pull 병합 보호창 시작
+  const auth = getAuth();
+  if (!auth) return;
+  try { await post("daily", { token: auth.token, overwrite: true, days: [{ date: key, ...day }] }); }
+  catch (e) { dropAuthIf401(e); }
+}
+
 // 최근 14일 업로드 — 로그인 상태일 때만. 서버도 GREATEST 병합이라 중복 전송 안전.
 let pushingDaily = false;
 export async function pushDaily() {
@@ -187,19 +206,26 @@ export async function pushDaily() {
 // 범위 내려받기(캘린더 월 이동 시) — 서버 기록을 로컬 pg_daily에 max 병합 후 전체 반환.
 export async function pullDailyRange(from, to) {
   const auth = getAuth();
-  const all = readDaily();
-  if (!auth) return all;
+  if (!auth) return readDaily();
   try {
     const r = await post("daily-pull", { token: auth.token, from, to });
+    // 로컬 스냅샷은 반드시 'await 후'에 읽는다 — 네트워크 대기 중 다른 코드(오늘 재계산·1분 스냅샷)가
+    // 쓴 값을, 대기 전에 떠 둔 낡은 사본으로 통째로 되덮는 lost-update를 막는다.
+    const all = readDaily();
+    // 재계산 직후 보호창: overwrite POST가 서버에 닿기 전에 응답한 pull이 옛 부풀린 값을
+    // max 병합으로 되살리지 않도록, 10분 안에는 오늘 키의 서버 값을 무시(로컬 유지).
+    const recalcAt = +(localStorage.getItem("pg_daily_recalc_at") || 0);
+    const guardToday = Date.now() - recalcAt < 10 * 60 * 1000 ? localDateStr() : null;
     for (const row of r.days || []) {
+      if (row.date === guardToday) continue;
       all[row.date] = mergeDay(all[row.date], {
         watched: row.watched_sec, good: row.good_sec, caution: row.caution_sec,
         bad: row.bad_sec, badCount: row.bad_count, longestGood: row.longest_good_sec,
       });
     }
     saveDaily(all);
-  } catch (e) { dropAuthIf401(e); }
-  return all;
+    return all;
+  } catch (e) { dropAuthIf401(e); return readDaily(); }
 }
 
 // 오늘 서버 기록 0으로 덮어쓰기(초기화 버튼용) — GREATEST 병합을 우회하는 overwrite 플래그 사용.
