@@ -331,6 +331,10 @@ function playAlert(stage, body) { // stage 1=BAD 진입, 2=에스컬레이션. b
 }
 
 function logTransition(from, to, t) {
+  // 이벤트는 항상 시간순 보장 — 과거 시각 봉인(stale pg_last_active 등)이 마지막 이벤트보다
+  // 앞서면 클램프. 역순 쌍이 남으면 리포트 합계에 음수 구간이 끼어 메인 타이머가 0에 갇힌다.
+  const last = events[events.length - 1];
+  if (last && t < last.t) t = last.t;
   events.push({ t, from, to });
   store.saveEvents(events);
   renderSummary();

@@ -164,7 +164,7 @@ export function computeReport(events, dayStartSec, nowSec) {
   for (let i = 0; i < events.length; i++) {
     const start = Math.max(events[i].t, dayStartSec);
     const end = i + 1 < events.length ? events[i + 1].t : nowSec;
-    if (end <= dayStartSec) continue;
+    if (end <= start) continue; // 창 밖 세그먼트 + 역순(음수 길이) 세그먼트 모두 제외 — 합계 오염 방지
     const st = events[i].to;
     if (st in acc) acc[st] += end - start;
     if (st === "GOOD") longestGood = Math.max(longestGood, end - start);
