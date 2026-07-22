@@ -6,7 +6,7 @@ import {
 } from "./core.js";
 // 3D 절대 지표 레이어 — 개인 z-score 위에 "거리에 강한 + 절대 바른자세" 게이트를 얹는다(core 무수정).
 import { AbsSmoother, extractAbsolute, finishAbsRef, absPenalty, absDominant, headPoseFromMatrix,
-  extractGuidePoints, finishGuide, projectGuide, computeDrift } from "./posture3d.js";
+  extractGuidePoints, finishGuide, projectGuide, computeDrift, TUNE3D } from "./posture3d.js";
 import { Rewards, MELODIES, SKINS, SHOP, TIERS, computeReport, hurtMotion } from "./reward.js";
 import { getAuth, syncPull, mergeData, startSyncLoop, writeDailySnapshot, pushDaily, localDateStr, recalcTodaySnapshot } from "./sync.js";
 import { computeSubjects, readSubjLog, readSubjects, writeDailySubjSnapshot } from "./subjects.js";
@@ -141,6 +141,78 @@ function driftTick(absM, ref, state, now) {
   resetDrift();                                    // 같은 추세로 재발화 방지
   speak("조금씩 무너지고 있어요 — 허리 한 번 펴볼까요?");
   showToast("자세가 서서히 무너지는 중이에요. 잠깐 고쳐 앉아요");
+}
+
+// ── 셀프 튜닝 패널 (?tune=1 켬 / ?tune=0 끔+초기화) — M3 실사용 튜닝용 ──
+// 임계값을 이 기기에서만(localStorage pg_tune) 실시간 조정. 배포 불필요, 다른 사용자 무영향.
+// 좋은 값을 찾으면 [값 복사]로 JSON을 공유 → 정식 상수로 반영하는 흐름.
+const TUNE_KNOBS = [
+  { obj: () => TUNE3D, key: "FORWARD_MARGIN",     label: "거북목 시작",        min: 0.05, max: 0.25, step: 0.01 },
+  { obj: () => TUNE3D, key: "FORWARD_FULL",       label: "거북목 램프 폭",     min: 0.05, max: 0.35, step: 0.01 },
+  { obj: () => TUNE3D, key: "TILT_MARGIN_DEG",    label: "어깨기울기 시작(°)", min: 1,    max: 10,   step: 0.5 },
+  { obj: () => TUNE3D, key: "PITCH_MARGIN_DEG",   label: "고개숙임 시작(°)",   min: 20,   max: 50,   step: 1 },
+  { obj: () => TUNE3D, key: "HEAD_DROP_DEADZONE", label: "머리 가라앉음",      min: 0.1,  max: 0.4,  step: 0.01 },
+  { obj: () => TUNE3D, key: "NEAR_DEADZONE",      label: "화면 근접",          min: 0.05, max: 0.3,  step: 0.01 },
+  { obj: () => TUNING, key: "BAD_ENTER_SUSTAIN",  label: "알림까지 지속(초)",  min: 3,    max: 15,   step: 1 },
+  { obj: () => TUNING, key: "AWAY_AFTER",         label: "자리비움 판정(초)",  min: 5,    max: 30,   step: 1 },
+  { obj: () => DRIFT,  key: "HV_DROP",            label: "드리프트: 가라앉음", min: 0.05, max: 0.25, step: 0.01 },
+  { obj: () => DRIFT,  key: "FWD_RISE",           label: "드리프트: 전방",     min: 0.05, max: 0.25, step: 0.01 },
+];
+const tuneDefaults = {};
+TUNE_KNOBS.forEach((k) => { tuneDefaults[k.key] = k.obj()[k.key]; });
+const tuneLoad = () => { try { return JSON.parse(localStorage.getItem("pg_tune") || "{}"); } catch { return {}; } };
+const tuneApply = (vals) => TUNE_KNOBS.forEach((k) => { if (Number.isFinite(vals[k.key])) k.obj()[k.key] = vals[k.key]; });
+{
+  const q = new URLSearchParams(location.search).get("tune");
+  if (q === "1") localStorage.setItem("pg_tune_on", "1");
+  else if (q === "0") { localStorage.removeItem("pg_tune_on"); localStorage.removeItem("pg_tune"); }
+}
+tuneApply(tuneLoad()); // 저장된 튜닝값을 부팅 시 적용 (패널 표시 여부와 무관)
+window.__pgTune = { TUNE3D, TUNING, DRIFT, defaults: tuneDefaults }; // 디버그·검증용
+if (localStorage.getItem("pg_tune_on") === "1") buildTunePanel();
+function buildTunePanel() {
+  const p = document.createElement("div");
+  p.id = "tune-panel";
+  p.innerHTML = `
+    <div id="tune-head"><b>임계값 튜닝</b><span>이 기기에만 적용</span><button id="tune-min" title="접기/펼치기">–</button></div>
+    <div id="tune-body"></div>
+    <div id="tune-foot"><button id="tune-reset">기본값 복원</button><button id="tune-copy">값 복사</button></div>`;
+  document.body.appendChild(p);
+  const body = p.querySelector("#tune-body");
+  const rows = TUNE_KNOBS.map((k) => {
+    const row = document.createElement("label");
+    row.className = "tune-row";
+    const cur = k.obj()[k.key];
+    row.innerHTML = `<span class="tune-lb">${k.label}</span>
+      <input type="range" min="${k.min}" max="${k.max}" step="${k.step}" value="${cur}">
+      <span class="tune-val${cur !== tuneDefaults[k.key] ? " tuned" : ""}">${cur}</span>`;
+    const inp = row.querySelector("input"), val = row.querySelector(".tune-val");
+    inp.oninput = () => {
+      const v = +inp.value;
+      k.obj()[k.key] = v;               // 즉시 반영 — term 함수들이 호출 시점에 읽음
+      val.textContent = v;
+      val.classList.toggle("tuned", v !== tuneDefaults[k.key]);
+      const s = tuneLoad(); s[k.key] = v; localStorage.setItem("pg_tune", JSON.stringify(s));
+    };
+    body.appendChild(row);
+    return row;
+  });
+  p.querySelector("#tune-min").onclick = () => p.classList.toggle("min");
+  p.querySelector("#tune-reset").onclick = () => {
+    localStorage.removeItem("pg_tune");
+    tuneApply(tuneDefaults);
+    rows.forEach((row, i) => {
+      const d = tuneDefaults[TUNE_KNOBS[i].key];
+      row.querySelector("input").value = d;
+      const v = row.querySelector(".tune-val"); v.textContent = d; v.classList.remove("tuned");
+    });
+    showToast("임계값을 기본값으로 되돌렸어요");
+  };
+  p.querySelector("#tune-copy").onclick = async () => {
+    const json = JSON.stringify(tuneLoad());
+    try { await navigator.clipboard.writeText(json); showToast("튜닝값을 복사했어요 — 개발자에게 붙여넣어 주세요"); }
+    catch { prompt("아래 값을 복사해 전달해주세요", json); }
+  };
 }
 let guideRef = null;                 // 트래킹 고스트 가이드(바른 머리위치, 어깨프레임)
 let guideCalibSamples = [];          // 캘리브 중 가이드 좌표 수집

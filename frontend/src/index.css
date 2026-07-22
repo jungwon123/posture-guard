@@ -1170,3 +1170,24 @@ body:has(#report-overlay.open) .buddy-bubble-wrap { display: none !important; }
   background: var(--accent); color: #fff; font-size: 13px; cursor: pointer;
 }
 .inapp-warn .inapp-alt { font-size: 12px; color: var(--dim); }
+
+/* 셀프 튜닝 패널 (?tune=1) — 기기 로컬 임계값 조정 */
+#tune-panel {
+  position: fixed; left: 10px; bottom: 78px; z-index: 90; width: 252px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+  color: var(--text); font-size: 12px; overflow: hidden;
+}
+#tune-head { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+#tune-head b { font-size: 12.5px; }
+#tune-head span { color: var(--dim); font-size: 10.5px; flex: 1; }
+#tune-head button { width: 22px; height: 22px; border-radius: 6px; border: 1px solid var(--line); background: transparent; color: var(--text); cursor: pointer; line-height: 1; }
+#tune-body { padding: 8px 12px; display: flex; flex-direction: column; gap: 7px; max-height: 46vh; overflow-y: auto; }
+.tune-row { display: grid; grid-template-columns: 96px 1fr 38px; align-items: center; gap: 8px; }
+.tune-lb { color: var(--dim); font-size: 11px; line-height: 1.25; }
+.tune-row input[type="range"] { width: 100%; accent-color: var(--accent); }
+.tune-val { text-align: right; font-variant-numeric: tabular-nums; }
+.tune-val.tuned { color: var(--accent); font-weight: 700; }
+#tune-foot { display: flex; gap: 8px; padding: 9px 12px; border-top: 1px solid var(--line); }
+#tune-foot button { flex: 1; padding: 6px 0; border-radius: 8px; border: 1px solid var(--line); background: transparent; color: var(--text); font-size: 12px; cursor: pointer; }
+#tune-foot button:hover { border-color: var(--accent); color: var(--accent); }
+#tune-panel.min #tune-body, #tune-panel.min #tune-foot { display: none; }

@@ -20,30 +20,33 @@ const MIN_VIS = 0.5;
 // 힘을 뺀다. 거북목 판정은 내려보기에 덜 오염된 forward(전방이동)·span(어깨말림)·tilt(어깨기울기)가 담당.
 const ABS_W = { head: 0.7, tilt: 1.4, pitch: 0.25, forward: 1.2, span: 1.4, lateral: 1.0, roll: 0.8, prop: 1.1,
   near: 0.9, camfwd: 1.0 }; // near/camfwd = 홍채 비율 기반(얼굴 트래킹 업그레이드) — head 1.6→0.7·pitch 0.5→0.25: 내려보기 오탐 완화
-const HEAD_DROP_DEADZONE = 0.25; // 기준 대비 25% 이상 내려가야 페널티(공부 중 책 보는 정도는 허용 — 0.15→0.25)
-const TILT_MARGIN_DEG = 4;       // 기준 +4° 초과부터 페널티 — 논문 교차근거: KIIT2026 비율±10%≈2~4°, JAICT2025≈8°의 교집합
-const TILT_FULL_DEG = 14;        // 14도 초과분에서 가중치 최대
-const PITCH_MARGIN_DEG = 35;     // 기준서 35도 이상 숙여야 페널티(화면·책 오가는 공부 허용 — 28→35)
-const PITCH_FULL_DEG = 48;       // 48도 초과분에서 가중치 최대(완만한 램프)
-// 거북목 전방이동 임계 — KIIT2026(하호진) Dfhd 기준 정렬: 정상 경계 5.5cm≈0.145·어깨너비, 심각 8cm≈0.21.
-// margin 0.13(≈5cm)부터 감점 시작, +0.12 램프로 0.25(≈9.5cm=임상 '심각')에서 만감점.
-const FORWARD_MARGIN = 0.13;
-const FORWARD_FULL = 0.12;
-const SPAN_DEADZONE = 0.06;      // 어깨너비/귀간격(3D)이 기준보다 6% 이상 줄어야 페널티(말림)
-const SPAN_FULL = 0.15;          // 15% 축소분에서 가중치 최대
-const LATERAL_MARGIN = 0.12;     // 귀중점이 어깨중점서 어깨너비의 0.12 이상 좌/우로 벗어나야 페널티(양방향)
-const LATERAL_FULL = 0.30;       // 0.30 초과분에서 가중치 최대
-const ROLL_MARGIN_DEG = 10;      // 고개 갸웃(roll)이 기준서 10도 이상 벗어나야 페널티(양방향)
-const ROLL_FULL_DEG = 30;        // 30도 초과분에서 가중치 최대
-const PROP_NEAR = 0.65;          // 손목이 코에서 어깨너비의 0.65 이내로 오면 '얼굴 괴기' 시작(고정 임계, 실기기 튜닝)
-const PROP_FULL = 0.35;          // 0.35 이내면 가중치 최대
-// 홍채 기반 절대 거리 — 사람 홍채 지름은 ~11.7mm로 거의 일정 → 화면상 홍채 크기의 '기준 대비 비율'이
-// 곧 카메라 거리 비율(초점거리·기기 화각 무관, 캘리브 ref 와의 비율이라 개인차도 상쇄).
-const NEAR_DEADZONE = 0.15;      // 홍채가 기준보다 15% 이상 커져야(=그만큼 가까워져야) 근접 페널티
-const NEAR_FULL = 0.40;          // 40% 초과분에서 최대
-const CAMFWD_DEADZONE = 0.10;    // '얼굴만' 가까워짐(몸통 제외)이 10% 초과부터 거북목 페널티
-const CAMFWD_FULL = 0.30;        // 30% 초과분에서 최대
-const CAMFWD_BODY_GATE = 0.08;   // 이미지상 어깨너비가 8% 이상 커졌으면 몸 전체가 다가온 것 → 거북목 아님(근접이 담당)
+// ── 판정 임계값 (셀프 튜닝 대상) ──
+// 기본값의 논문 근거는 docs/임계값-선정.md. ?tune=1 패널이 이 객체의 속성을 런타임에 덮어쓴다
+// (기기 localStorage 한정 — 다른 사용자 무영향). 각 term 함수는 호출 시점에 읽으므로 즉시 반영.
+export const TUNE3D = {
+  HEAD_DROP_DEADZONE: 0.25, // 기준 대비 25% 이상 내려가야 페널티(공부 중 책 보는 정도는 허용)
+  TILT_MARGIN_DEG: 4,       // 기준 +4° 초과부터 — KIIT2026 비율±10%≈2~4° × JAICT2025≈8° 교집합
+  TILT_FULL_DEG: 14,
+  PITCH_MARGIN_DEG: 35,     // 기준서 35° 이상 숙여야(화면·책 오가는 공부 허용)
+  PITCH_FULL_DEG: 48,
+  // 거북목 — KIIT2026 Dfhd 정렬: 정상 경계 5.5cm≈0.145·어깨너비, 0.25(≈9.5cm=임상 '심각')에서 만감점
+  FORWARD_MARGIN: 0.13,
+  FORWARD_FULL: 0.12,
+  SPAN_DEADZONE: 0.06,      // 어깨너비/귀간격(3D)이 기준보다 6% 이상 줄어야(말림)
+  SPAN_FULL: 0.15,
+  LATERAL_MARGIN: 0.12,     // 귀중점 좌/우 이탈(양방향)
+  LATERAL_FULL: 0.30,
+  ROLL_MARGIN_DEG: 10,      // 고개 갸웃(양방향)
+  ROLL_FULL_DEG: 30,
+  PROP_NEAR: 0.65,          // 손목-코 거리 이내면 '턱괴기' 시작(고정 임계)
+  PROP_FULL: 0.35,
+  // 홍채 절대 거리 — 지름 ~11.7mm 일정 → 기준 대비 비율 = 거리 비율(화각 무관)
+  NEAR_DEADZONE: 0.15,
+  NEAR_FULL: 0.40,
+  CAMFWD_DEADZONE: 0.10,    // '얼굴만' 가까워짐(몸통 제외) 10% 초과부터
+  CAMFWD_FULL: 0.30,
+  CAMFWD_BODY_GATE: 0.08,   // 몸 전체 근접(어깨너비 +8%)이면 거북목 아님
+};
 
 // ── One-Euro 필터 (지터는 줄이고 지연은 최소) ──
 class LowPass {
@@ -216,56 +219,56 @@ export function finishAbsRef(samples) {
 // 머리 pitch 편차(양방향, 여유 넉넉) → 0..1.5. m·ref 둘 다 headPitch 있을 때만.
 function pitchTerm(m, ref) {
   if (m.headPitch == null || ref.headPitch == null) return 0;
-  const dp = Math.abs(m.headPitch - ref.headPitch) - PITCH_MARGIN_DEG;
-  return dp > 0 ? Math.min(dp / PITCH_FULL_DEG, 1.5) : 0;
+  const dp = Math.abs(m.headPitch - ref.headPitch) - TUNE3D.PITCH_MARGIN_DEG;
+  return dp > 0 ? Math.min(dp / TUNE3D.PITCH_FULL_DEG, 1.5) : 0;
 }
 
 // 전방머리(거북목) 편차 → 0..1.5. '앞으로' 나온 만큼만(뒤로 젖힘은 무시=비대칭).
 // MediaPipe world z: 작을수록 카메라에 가까움 → 거북목이면 귀 z↓ → headForward↑ → 기준보다 커짐.
 function forwardTerm(m, ref) {
   if (m.headForward == null || ref.headForward == null) return 0;
-  const f = (m.headForward - ref.headForward) - FORWARD_MARGIN;
-  return f > 0 ? Math.min(f / FORWARD_FULL, 1.5) : 0;
+  const f = (m.headForward - ref.headForward) - TUNE3D.FORWARD_MARGIN;
+  return f > 0 ? Math.min(f / TUNE3D.FORWARD_FULL, 1.5) : 0;
 }
 
 // 어깨 말림 → 0..1.5. 3D 어깨너비/귀간격이 기준보다 '줄어든' 만큼만(말릴수록 감소).
 function spanTerm(m, ref) {
   if (m.shoulderSpan == null || ref.shoulderSpan == null) return 0;
-  const sdrop = (ref.shoulderSpan - m.shoulderSpan) / Math.max(ref.shoulderSpan, 1e-3) - SPAN_DEADZONE;
-  return sdrop > 0 ? Math.min(sdrop / SPAN_FULL, 1.5) : 0;
+  const sdrop = (ref.shoulderSpan - m.shoulderSpan) / Math.max(ref.shoulderSpan, 1e-3) - TUNE3D.SPAN_DEADZONE;
+  return sdrop > 0 ? Math.min(sdrop / TUNE3D.SPAN_FULL, 1.5) : 0;
 }
 
 // 머리 좌우 쏠림 → 0..1.5. 기준 대비 좌/우 어느 쪽이든(양방향) 벗어난 만큼.
 function lateralTerm(m, ref) {
   if (m.headLateral == null || ref.headLateral == null) return 0;
-  const dl = Math.abs(m.headLateral - ref.headLateral) - LATERAL_MARGIN;
-  return dl > 0 ? Math.min(dl / LATERAL_FULL, 1.5) : 0;
+  const dl = Math.abs(m.headLateral - ref.headLateral) - TUNE3D.LATERAL_MARGIN;
+  return dl > 0 ? Math.min(dl / TUNE3D.LATERAL_FULL, 1.5) : 0;
 }
 
 // 고개 갸웃(roll) → 0..1.5. 기준 대비 양방향 편차.
 function rollTerm(m, ref) {
   if (m.headRoll == null || ref.headRoll == null) return 0;
-  const dr = Math.abs(m.headRoll - ref.headRoll) - ROLL_MARGIN_DEG;
-  return dr > 0 ? Math.min(dr / ROLL_FULL_DEG, 1.5) : 0;
+  const dr = Math.abs(m.headRoll - ref.headRoll) - TUNE3D.ROLL_MARGIN_DEG;
+  return dr > 0 ? Math.min(dr / TUNE3D.ROLL_FULL_DEG, 1.5) : 0;
 }
 
-// 손으로 얼굴 괴기 → 0..1.5. 손목이 코에 PROP_NEAR 이내로 오면 가까울수록 커짐(캘리브 무관 고정임계).
+// 손으로 얼굴 괴기 → 0..1.5. 손목이 코에 TUNE3D.PROP_NEAR 이내로 오면 가까울수록 커짐(캘리브 무관 고정임계).
 function propTerm(m) {
   if (m.handToFace == null) return 0;
-  const near = PROP_NEAR - m.handToFace;
-  return near > 0 ? Math.min(near / (PROP_NEAR - PROP_FULL), 1.5) : 0;
+  const near = TUNE3D.PROP_NEAR - m.handToFace;
+  return near > 0 ? Math.min(near / (TUNE3D.PROP_NEAR - TUNE3D.PROP_FULL), 1.5) : 0;
 }
 
 // 머리 가라앉음(귀-어깨 수직 축소) → 0.. . 기준 대비 deadzone 초과분.
 function headDropTerm(m, ref) {
   if (!ref.headVertical) return 0;
-  const drop = (ref.headVertical - m.headVertical) / Math.max(ref.headVertical, 1e-3) - HEAD_DROP_DEADZONE;
+  const drop = (ref.headVertical - m.headVertical) / Math.max(ref.headVertical, 1e-3) - TUNE3D.HEAD_DROP_DEADZONE;
   return drop > 0 ? drop : 0;
 }
 // 어깨 기울기 → 0..1.5. 기준 + 마진 초과분.
 function tiltTerm(m, ref) {
-  const t = m.shoulderTilt - (ref.shoulderTilt + TILT_MARGIN_DEG);
-  return t > 0 ? Math.min(t / TILT_FULL_DEG, 1.5) : 0;
+  const t = m.shoulderTilt - (ref.shoulderTilt + TUNE3D.TILT_MARGIN_DEG);
+  return t > 0 ? Math.min(t / TUNE3D.TILT_FULL_DEG, 1.5) : 0;
 }
 
 // 각 절대 신호의 (메시지키, 가중 기여도) 목록. absPenalty(결합)·absDominant(최댓값) 공용 SSoT.
@@ -273,8 +276,8 @@ function tiltTerm(m, ref) {
 // 캘리브 품질·기기 화각과 무관. 멀어지는 건 무시(비대칭).
 function nearTerm(m, ref) {
   if (m.irisNorm == null || ref.irisNorm == null || !(ref.irisNorm > 0)) return 0;
-  const closer = m.irisNorm / ref.irisNorm - 1 - NEAR_DEADZONE;
-  return closer > 0 ? Math.min(closer / NEAR_FULL, 1.5) : 0;
+  const closer = m.irisNorm / ref.irisNorm - 1 - TUNE3D.NEAR_DEADZONE;
+  return closer > 0 ? Math.min(closer / TUNE3D.NEAR_FULL, 1.5) : 0;
 }
 
 // 카메라 전진 거북목 → 0..1.5. '얼굴만' 가까워졌을 때(몸통 어깨너비는 그대로) = 머리를 앞으로 뺀 것.
@@ -283,9 +286,9 @@ function camForwardTerm(m, ref) {
   if (m.irisNorm == null || ref.irisNorm == null || !(ref.irisNorm > 0)) return 0;
   if (m.camW == null || ref.camW == null || !(ref.camW > 0)) return 0;
   const bodyCloser = m.camW / ref.camW - 1;
-  if (bodyCloser > CAMFWD_BODY_GATE) return 0; // 몸 전체 근접 — 거북목 아님
-  const headCloser = m.irisNorm / ref.irisNorm - 1 - Math.max(bodyCloser, 0) - CAMFWD_DEADZONE;
-  return headCloser > 0 ? Math.min(headCloser / CAMFWD_FULL, 1.5) : 0;
+  if (bodyCloser > TUNE3D.CAMFWD_BODY_GATE) return 0; // 몸 전체 근접 — 거북목 아님
+  const headCloser = m.irisNorm / ref.irisNorm - 1 - Math.max(bodyCloser, 0) - TUNE3D.CAMFWD_DEADZONE;
+  return headCloser > 0 ? Math.min(headCloser / TUNE3D.CAMFWD_FULL, 1.5) : 0;
 }
 
 function absContribs(m, ref) {
