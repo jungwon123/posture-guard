@@ -1,7 +1,7 @@
 {
-  "tool_name": "mcp__Claude_Browser__navigate",
-  "tool_input_preview": "{\"url\":\"http://localhost:5173\",\"force\":true}",
-  "error": "MCP error -32602: Input validation error: Invalid arguments for tool navigate: [\n  {\n    \"expected\": \"string\",\n    \"code\": \"invalid_type\",\n    \"path\": [\n      \"tabId\"\n    ],\n    \"message\": \"Invalid input: expected string, received undefined\"\n  }\n]",
-  "timestamp": "2026-07-21T16:49:26.817Z",
-  "retry_count": 1
+  "tool_name": "mcp__Claude_Browser__javascript_tool",
+  "tool_input_preview": "{\"action\":\"javascript_exec\",\"tabId\":\"seed\",\"text\":\"new Promise((resolve) => {\\n  const getPos = () => { const b = document.querySelector(\\\".buddy\\\"); return b.style.left + \\\",\\\" + b.style.top; };\\n  c...",
+  "error": "javascript_tool timed out after 30s. The Browser pane may be stuck (modal dialog, navigation hang, or unresponsive renderer). Check preview_console_logs for errors.",
+  "timestamp": "2026-07-22T01:46:33.603Z",
+  "retry_count": 2
 }

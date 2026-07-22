@@ -69,8 +69,10 @@ export default function Buddy() {
   const [dragging, setDragging] = useState(false);
   const R = useRef({ state: null, worst: null, lastSpeak: 0, lastMove: 0, bubbleUntil: 0, anim: "idle" });
   const posRef = useRef(pos);          // 드래그·말풍선 배치가 공유하는 현재 위치
-  const pinRef = useRef(loadPin());    // 사용자가 직접 놓은 자리 — 있으면 자동 이동(로밍·무대) 중지
-  const dragRef = useRef(null);        // { dx, dy } 포인터-요정 오프셋
+  // 드래그로 놓은 자리엔 '잠시' 머문다(가리던 콘텐츠 비켜주기) — 유예가 끝나면 다시 자유 로밍.
+  const HOLD_MS = 90_000;
+  const holdUntilRef = useRef(0);      // 이 시각(performance.now)까지 자동 이동(로밍·무대) 중지
+  const dragRef = useRef(null);        // { dx, dy, moved } 포인터-요정 오프셋 + 실제 이동 여부
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -78,7 +80,8 @@ export default function Buddy() {
       // 설정 페이지에서 요정 숨김/위치 초기화를 바꾸면 리로드 없이 반영
       const off = localStorage.getItem("pg_buddy_off") === "1";
       setHidden(off);
-      if (!localStorage.getItem("pg_buddy_pos") && pinRef.current) pinRef.current = null;
+      // 설정 > 위치 초기화: 저장 위치가 지워지면 유예도 즉시 해제 → 바로 다시 돌아다님
+      if (!localStorage.getItem("pg_buddy_pos") && holdUntilRef.current) holdUntilRef.current = 0;
       // 자가 치유: 어떤 이유로든 위치가 화면 밖이면 고정 자리(없으면 기본 자리)로 복귀
       // (뷰포트가 아직 0인 순간 — 백그라운드 탭 복원 등 — 에는 계산이 오염되므로 스킵)
       if (!off && innerWidth > 100 && innerHeight > 100) {
@@ -128,10 +131,11 @@ export default function Buddy() {
       { left: x0 + 56, top: Math.round(h * 0.4) }, { left: x0 + w - B - 56, top: Math.round(h * 0.4) },
       { left: x0 + 56, top: h - 250 }, { left: x0 + w - B - 56, top: h - 250 },
     ]; };
-    // 사용자가 직접 놓은 자리(pin)가 있으면 요정이 마음대로 안 움직인다 — 로밍·무대이동 모두 스킵
-    const roam = () => { if (!pinRef.current) setBoth(perches()[Math.floor(Math.random() * 6)]); };
+    // 드래그 중이거나 놓은 자리 유예(HOLD_MS) 동안에는 자동 이동 금지 — 유예가 끝나면 자유 로밍 재개
+    const autoMoveBlocked = () => dragRef.current || performance.now() < holdUntilRef.current;
+    const roam = () => { if (!autoMoveBlocked()) setBoth(perches()[Math.floor(Math.random() * 6)]); };
     // 말할 때 서는 '무대' — 카메라 <video> 위에 말풍선이 가려지므로(비디오 오버레이) 비디오 없는 하단 중앙으로
-    const stageSpot = () => { if (!pinRef.current) setBoth({ left: Math.round(fx() + fw() / 2 - B / 2), top: Math.max(120, innerHeight - 240) }); };
+    const stageSpot = () => { if (!autoMoveBlocked()) setBoth({ left: Math.round(fx() + fw() / 2 - B / 2), top: Math.max(120, innerHeight - 240) }); };
     const say = (t, ms = 4600) => { stageSpot(); showBubble(t); R.current.bubbleUntil = performance.now() + ms; R.current.lastSpeak = performance.now(); };
 
     // setAnim은 stale closure(deps=[hidden])라 anim 상태를 직접 비교하면 안 됨 — R.current.anim이 진실.
@@ -168,12 +172,13 @@ export default function Buddy() {
     return () => { clearInterval(id); wrap.remove(); };
   }, [hidden]); // eslint-disable-line
 
-  // 드래그로 요정 옮기기 — 놓은 자리는 저장되고, 그 뒤로는 요정이 스스로 안 움직인다(콘텐츠 가림 방지)
+  // 드래그로 요정 옮기기 — 놓은 자리에 잠시(HOLD_MS) 머물렀다가 다시 자유롭게 돌아다닌다.
+  // 저장된 위치는 다음 부팅의 시작 자리로만 쓰인다(영구 고정 아님).
   const onPointerDown = (e) => {
     if (e.target.closest(".buddy-x")) return;
     e.preventDefault(); // 드래그 중 페이지 텍스트 선택 방지
-    e.currentTarget.setPointerCapture?.(e.pointerId);
-    dragRef.current = { dx: e.clientX - posRef.current.left, dy: e.clientY - posRef.current.top };
+    try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch {} // 일부 브라우저는 무효 포인터에 throw
+    dragRef.current = { dx: e.clientX - posRef.current.left, dy: e.clientY - posRef.current.top, moved: false };
     setDragging(true);
   };
   const onPointerMove = (e) => {
@@ -183,13 +188,16 @@ export default function Buddy() {
       left: Math.min(Math.max(e.clientX - dragRef.current.dx, 0), innerWidth - B),
       top: Math.min(Math.max(e.clientY - dragRef.current.dy, 0), innerHeight - B),
     };
+    if (Math.hypot(p.left - posRef.current.left, p.top - posRef.current.top) > 6) dragRef.current.moved = true;
     posRef.current = p; setPos(p);
     document.querySelector(".buddy-bubble-wrap")?.__place?.(); // 말풍선 따라오기
   };
   const onPointerUp = () => {
     if (!dragRef.current) return;
+    const moved = dragRef.current.moved;
     dragRef.current = null; setDragging(false);
-    pinRef.current = posRef.current;
+    if (!moved) return; // 제자리 탭은 유예 없음 — 로밍 그대로
+    holdUntilRef.current = performance.now() + HOLD_MS;
     localStorage.setItem("pg_buddy_pos", JSON.stringify(posRef.current));
   };
 

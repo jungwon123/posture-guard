@@ -184,7 +184,7 @@ function DataCard() {
   );
 }
 
-// 요정 도우미 — 숨긴 요정 복구 + 드래그로 고정한 위치 풀기
+// 요정 도우미 — 숨긴 요정 복구 + 놓아둔 자리(부팅 시작점·유예) 초기화
 function FairyCard() {
   const [off, setOff] = useState(() => localStorage.getItem("pg_buddy_off") === "1");
   const [pinned, setPinned] = useState(() => !!localStorage.getItem("pg_buddy_pos"));
@@ -208,7 +208,7 @@ function FairyCard() {
       <p className="hint">
         {off
           ? "요정이 숨어 있어요. 다시 부르면 화면을 돌아다니며 자세를 봐줘요."
-          : "화면 속 요정을 끌어서 원하는 자리에 둘 수 있어요. 요정의 X 버튼으로 숨길 수 있어요."}
+          : "요정을 끌어 옮기면 잠시 그 자리에 머물렀다가 다시 돌아다녀요. X 버튼으로 숨길 수 있어요."}
       </p>
       <div className="row" style={{ display: "flex", gap: 8 }}>
         <button type="button" onClick={toggle}>{off ? "요정 다시 부르기" : "요정 숨기기"}</button>
