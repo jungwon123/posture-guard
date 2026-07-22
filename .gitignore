@@ -7,3 +7,4 @@ frontend/node_modules/
 frontend/dist/
 backend-vm/node_modules/
 infra/.env
+infra-lk/.env

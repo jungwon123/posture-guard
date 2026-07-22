@@ -54,17 +54,7 @@ services:
     # 캐시·presence 전용 — 영속화 없음, 64MB 상한 + LRU (e2-small 2GB 배려)
     command: ["redis-server", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru", "--save", "", "--appendonly", "no"]
 
-  # UDP 대역(50000-50200) 때문에 host 네트워크 — VM 전용 프로필 (Mac Docker Desktop은 host 네트워크 미지원)
-  livekit:
-    image: livekit/livekit-server:v1.13.4
-    restart: unless-stopped
-    profiles: ["vm"]
-    network_mode: host
-    command: ["--config", "/etc/livekit.yaml"]
-    environment:
-      LIVEKIT_KEYS: "${LIVEKIT_SELF_KEY}: ${LIVEKIT_SELF_SECRET}"
-    volumes:
-      - ./livekit/livekit.yaml:/etc/livekit.yaml:ro
+  # livekit(SFU)은 미디어 전용 VM(lk-sfu-vm)으로 분리 — infra-lk/ 참고. 여기는 컨트롤 플레인만.
 
   # 인증서 발급/갱신 전용 — `docker compose --profile certs run --rm certbot ...`
   certbot:

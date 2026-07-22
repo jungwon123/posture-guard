@@ -1,0 +1,35 @@
+name: lk-sfu
+
+# 미디어 플레인 전용 VM(lk-sfu-vm) — 컨트롤 플레인(pg-api-vm)과 분리 운영.
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - certbot-etc:/etc/letsencrypt:ro
+      - certbot-web:/var/www/certbot
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  livekit:
+    image: livekit/livekit-server:v1.13.4
+    restart: unless-stopped
+    network_mode: host
+    command: ["--config", "/etc/livekit.yaml"]
+    environment:
+      LIVEKIT_KEYS: "${LIVEKIT_SELF_KEY}: ${LIVEKIT_SELF_SECRET}"
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml:ro
+
+  certbot:
+    image: certbot/certbot
+    profiles: ["certs"]
+    volumes:
+      - certbot-etc:/etc/letsencrypt
+      - certbot-web:/var/www/certbot
+
+volumes:
+  certbot-etc:
+  certbot-web:
