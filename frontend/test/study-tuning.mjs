@@ -1,6 +1,6 @@
 // 공부 특화 튜닝 검증: '내려보기(정상 공부)'는 저감점, '전방 craning(거북목)'은 고감점
-import { absPenalty } from "/Users/jwon/Downloads/turtle/frontend/src/posture3d.js";
-import { TUNING } from "/Users/jwon/Downloads/turtle/frontend/src/core.js";
+import { absPenalty } from "../src/posture3d.js";
+import { TUNING } from "../src/core.js";
 
 let pass = 0, fail = 0;
 const ok = (n, c, extra = "") => { if (c) pass++; else { fail++; console.log("  ✗ FAIL:", n, extra); } };

@@ -1,6 +1,6 @@
 // 논문 반영 개선 단위테스트: (1) absPenalty 중복감점 완화 (2) CAUTION 상태머신
-import { absPenalty, absDominant } from "/Users/jwon/Downloads/turtle/frontend/src/posture3d.js";
-import { StateMachine, TUNING } from "/Users/jwon/Downloads/turtle/frontend/src/core.js";
+import { absPenalty, absDominant } from "../src/posture3d.js";
+import { StateMachine, TUNING } from "../src/core.js";
 
 let pass = 0, fail = 0;
 const ok = (name, cond) => { if (cond) { pass++; } else { fail++; console.log("  ✗ FAIL:", name); } };
