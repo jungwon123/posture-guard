@@ -405,6 +405,40 @@ async function acquireCamera() {
   await els.cam.play();
 }
 
+// getUserMedia 실패를 사용자 언어로 — 권한 거부 상태에서 [공부 시작]이 무반응처럼 보이지 않게 (QC2차 #7)
+// cam-retry 오버레이를 재사용하므로, 복귀-재개 경로의 기본 문구를 기억해뒀다 성공 시 복원한다.
+const camRetryDefault = {
+  t: els.camRetry?.querySelector(".away-title")?.innerHTML,
+  s: els.camRetry?.querySelector(".away-sub")?.innerHTML,
+  b: els.btnCamRetry?.textContent,
+};
+function resetCamRetryText() {
+  const t = els.camRetry?.querySelector(".away-title"), s = els.camRetry?.querySelector(".away-sub");
+  if (t && camRetryDefault.t) t.innerHTML = camRetryDefault.t;
+  if (s && camRetryDefault.s) s.innerHTML = camRetryDefault.s;
+  if (els.btnCamRetry && camRetryDefault.b) els.btnCamRetry.textContent = camRetryDefault.b;
+}
+function camErrorText(e) {
+  const n = e?.name || "";
+  if (n === "NotAllowedError" || n === "SecurityError")
+    return ["카메라 허용이 필요해요", "브라우저가 카메라를 차단하고 있어요.<br/>주소창의 자물쇠(또는 카메라) 아이콘을 눌러<br/>카메라를 <b>허용</b>으로 바꾼 뒤 다시 시도해 주세요."];
+  if (n === "NotFoundError" || n === "OverconstrainedError")
+    return ["카메라를 찾을 수 없어요", "기기에 카메라가 연결돼 있는지 확인해 주세요."];
+  if (n === "NotReadableError")
+    return ["다른 앱이 카메라를 쓰고 있어요", "화상회의·카메라 앱을 닫고 다시 시도해 주세요."];
+  return ["카메라를 켜지 못했어요", "잠시 후 아래 버튼으로 다시 시도해 주세요."];
+}
+function showCamStartError(e) {
+  const [title, sub] = camErrorText(e);
+  const t = els.camRetry?.querySelector(".away-title"), s = els.camRetry?.querySelector(".away-sub");
+  if (t) t.textContent = title;
+  if (s) s.innerHTML = sub;
+  if (els.btnCamRetry) els.btnCamRetry.textContent = "다시 시도";
+  show(els.startCta, false); // 시작 CTA 위에 안내가 정확히 보이게
+  show(els.camRetry, true);
+  els.msg.textContent = title;
+}
+
 async function start() {
   els.btnStart.disabled = true;
   els.msg.textContent = landmarker ? "카메라 켜는 중…" : "모델 로딩 중…";
@@ -428,10 +462,12 @@ async function start() {
     }
     await acquireCamera();
   } catch (e) {
-    els.msg.textContent = "시작 실패: " + e.message + " (카메라 권한을 확인하세요)";
+    showCamStartError(e);
     els.btnStart.disabled = false;
     return;
   }
+  show(els.camRetry, false); // 이전 시작 실패 안내가 남아있으면 정리
+  resetCamRetryText();
   running = true;
   sessionStartSec = nowSec(); // 세션 타이머 기준
   els.btnStart.textContent = "공부 종료";
@@ -493,7 +529,7 @@ function showSessionSummary() {
   const rep = computeReport(events, dayStartSec(), nowSec());
   if (rep.watched <= 5) { // 실사용이 거의 없으면 요약 생략
     centerPop(`<div class="cp-title">측정을 종료했어요</div>
-      <div class="cp-sub">카메라가 꺼졌습니다. 수고했어요!</div>`, 2600);
+      <div class="cp-sub">카메라가 꺼졌어요 · 기록은 저장됐어요. 수고했어요!</div>`, 2600);
     return;
   }
   const ratio = rep.ratio !== null ? `${Math.round(rep.ratio * 100)}%` : "-";
@@ -503,7 +539,7 @@ function showSessionSummary() {
       <div class="cp-stat"><b>${ratio}</b><span>바름 비율</span></div>
       <div class="cp-stat"><b>${(rep.watched / 60).toFixed(0)}분</b><span>총 시간</span></div>
     </div>
-    <div class="cp-sub">카메라가 꺼졌습니다 · 자세히 보려면 [오늘 리포트]</div>`, 3600);
+    <div class="cp-sub">카메라가 꺼졌어요 · 기록은 저장됐어요 · 자세히는 [오늘 리포트]</div>`, 3600);
 }
 
 // ── 카메라 백그라운드 복귀 재개 ──
@@ -539,7 +575,8 @@ async function resumeCamera() {
 document.addEventListener("visibilitychange", () => { if (!document.hidden) resumeCamera(); });
 window.addEventListener("pageshow", () => resumeCamera());
 if (els.btnCamRetry) els.btnCamRetry.onclick = async () => { // 수동 재시도(사용자 제스처)
-  if (!running) return;
+  if (!running) { start(); return; } // 시작 실패(권한 거부 등) 후의 [다시 시도] — 처음부터 재시도
+
   els.btnCamRetry.disabled = true;
   try {
     await acquireCamera();
@@ -1574,11 +1611,27 @@ function renderGroupSwitcher() {
           <div class="gl-top"><span class="gl-name">${esc(g.name)}</span>${badge}</div>
           <div class="gl-meta">코드 ${g.code} · 나: ${esc(g.nickname)} ${cnt}</div>
         </div>
+        <button class="gl-rename" data-rename="${g.code}" title="이 방에서 쓰는 이름 바꾸기">이름</button>
         <button class="gl-leave" data-leave="${g.code}" title="이 그룹에서 나가기">나가기</button>
       </div>`;
     }).join("") + `</div>`;
 }
 $("group-switcher")?.addEventListener("click", async (e) => {
+  const rn = e.target.closest(".gl-rename");
+  if (rn) { // 방 안에서 쓰는 이름 바꾸기 (QC2차 #23 — 서버 join이 닉네임 upsert 겸용)
+    e.stopPropagation();
+    const code = rn.dataset.rename, g = myGroups().find((v) => v.code === code);
+    const nick = (prompt("이 방에서 쓸 이름 (2~12자)", g?.nickname || "") || "").trim();
+    if (!nick || nick === g?.nickname) return;
+    try {
+      await api("join", { code, nickname: nick, memberId });
+      upsertGroup({ ...g, nickname: nick });
+      renderGroupSwitcher();
+      refreshLeaderboard();
+      els.msg.textContent = `이 방에서의 이름을 '${nick}'로 바꿨어요.`;
+    } catch { els.msg.textContent = "이름 변경에 실패했어요 — 잠시 후 다시 시도해 주세요."; }
+    return;
+  }
   const lv = e.target.closest(".gl-leave");
   if (lv) { // 나가기
     e.stopPropagation();

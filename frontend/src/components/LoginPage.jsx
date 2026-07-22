@@ -6,6 +6,21 @@ import { apiLogin, apiRegister, apiGoogleLogin, setAuth, restoreData, wipeLocalD
 
 const GSI_SRC = "https://accounts.google.com/gsi/client";
 
+// 카카오톡 등 인앱 브라우저(WebView)에서는 구글이 OAuth를 차단한다(disallowed_useragent) — QC2차 #1.
+// 감지되면 배너로 외부 브라우저 열기를 안내한다. 이메일 로그인은 인앱에서도 동작.
+const IN_APP_BROWSER = /KAKAOTALK|Instagram|FBAN|FBAV|Line\/|NAVER\(inapp/i.test(navigator.userAgent);
+function openInExternalBrowser() {
+  const url = location.href.split("#")[0];
+  if (/KAKAOTALK/i.test(navigator.userAgent)) {
+    location.href = "kakaotalk://web/openExternal?url=" + encodeURIComponent(url);
+  } else if (/android/i.test(navigator.userAgent)) {
+    location.href = `intent://${location.host}${location.pathname}${location.search}#Intent;scheme=https;end`;
+  } else {
+    // iOS 일반 인앱: 스킴이 없어 안내 문구에 의존 (배너의 수동 안내 참고)
+    alert("우측 하단(또는 상단) 메뉴에서 '다른 브라우저로 열기'를 눌러주세요.");
+  }
+}
+
 export default function LoginPage() {
   const [mode, setMode] = useState("login"); // login | register
   const [email, setEmail] = useState("");
@@ -111,6 +126,14 @@ export default function LoginPage() {
     <div className="login-card-v2">
       <h2 className="login-title">척추요정</h2>
       <p className="login-tagline">함께 공부하고, 자세는 요정이 지켜줘요</p>
+      {IN_APP_BROWSER && (
+        <div className="inapp-warn" role="alert">
+          <b>카카오톡 등 앱 속 브라우저에서는 구글 로그인이 막혀요.</b>
+          <span>이메일 로그인은 여기서도 돼요. 구글로 하려면 외부 브라우저로 열어주세요.</span>
+          <button type="button" onClick={openInExternalBrowser}>외부 브라우저로 열기</button>
+          <span className="inapp-alt">버튼이 안 되면: 화면 우하단(또는 우상단) 메뉴 → '다른 브라우저로 열기'</span>
+        </div>
+      )}
       <div className="login-more-open">
         <form className="login-form" onSubmit={submit}>
           <input type="email" placeholder="이메일" autoComplete="email"

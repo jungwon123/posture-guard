@@ -279,6 +279,12 @@
     padding: 4px 11px; cursor: pointer; transition: all .15s;
   }
   .gl-leave:hover { color: #fff; background: var(--bad); border-color: var(--bad); }
+  .gl-rename {
+    flex-shrink: 0; font-size: 12px; color: var(--dim);
+    background: transparent; border: 1px solid var(--line); border-radius: 999px;
+    padding: 4px 11px; cursor: pointer; transition: all .15s;
+  }
+  .gl-rename:hover { color: #fff; background: var(--accent); border-color: var(--accent); }
   .gl-empty { font-size: 13px; color: var(--dim); line-height: 1.65; padding: 6px 2px 2px; }
   /* 그룹 만들기·참여 = 접이식(평소 접힘, 그룹 없으면 자동 펼침) */
   #group-info:empty { display: none; }
@@ -1143,3 +1149,24 @@ input::placeholder { color: var(--dim); }
   background: url("/assets/ui/btn-frame.png") center / 100% 100% no-repeat, var(--accent);
   color: #101418; padding: 12px 18px;
 }
+
+/* ── QC 2차 반영 ── */
+/* 리포트 오버레이가 열리면 도우미 요정·말풍선 숨김 — 오버레이 뒤로 반쯤 깔려 보이던 문제(#19) */
+body:has(#report-overlay.open) .buddy,
+body:has(#report-overlay.open) .buddy-bubble-wrap { display: none !important; }
+
+/* 인앱 브라우저(카톡 등) 구글 로그인 차단 안내 배너(#1) */
+.inapp-warn {
+  display: flex; flex-direction: column; gap: 6px;
+  margin: 4px 0 10px; padding: 12px 14px;
+  border: 1px solid var(--line); border-radius: 12px;
+  background: color-mix(in srgb, var(--warn, #b07d18) 12%, transparent);
+  font-size: 13px; line-height: 1.55; text-align: left;
+}
+.inapp-warn b { font-size: 13.5px; }
+.inapp-warn button {
+  align-self: flex-start; margin-top: 2px; padding: 7px 14px;
+  border-radius: 999px; border: 1px solid var(--accent);
+  background: var(--accent); color: #fff; font-size: 13px; cursor: pointer;
+}
+.inapp-warn .inapp-alt { font-size: 12px; color: var(--dim); }

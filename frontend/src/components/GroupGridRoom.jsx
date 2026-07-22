@@ -45,10 +45,16 @@ function PostureTile({ postures, onNudge, cooldown }) {
 
 function Grid({ postures, onNudge, cooldown }) {
   const tracks = useTracks([{ source: Track.Source.Camera, withPlaceholder: true }]);
+  const anyCam = tracks.some((t) => t.publication); // 실제 영상을 발행 중인 타일이 있나
   return (
-    <GridLayout tracks={tracks} style={{ height: "min(58vh, 440px)" }}>
-      <PostureTile postures={postures} onNudge={onNudge} cooldown={cooldown} />
-    </GridLayout>
+    <>
+      {!anyCam && (
+        <p className="hint rtc-empty">아직 <b>카메라를 켠 친구가 없어서</b> 화면이 비어 보여요 — 위의 [내 카메라 공유하기]를 켜면 내 화면이 나와요. 자세 점수 타일은 카메라 없이도 보여요.</p>
+      )}
+      <GridLayout tracks={tracks} style={{ height: "min(58vh, 440px)" }}>
+        <PostureTile postures={postures} onNudge={onNudge} cooldown={cooldown} />
+      </GridLayout>
+    </>
   );
 }
 
@@ -60,9 +66,11 @@ function ShareToggle() {
     const lp = room.localParticipant;
     try {
       if (v) {
-        const track = document.getElementById("cam")?.srcObject?.getVideoTracks?.()[0];
-        if (!track) { setMsg("카메라를 먼저 켜야 공유할 수 있어요."); setOn(false); return; }
-        await lp.publishTrack(track, { source: Track.Source.Camera, name: "posture" });
+        const src = document.getElementById("cam")?.srcObject?.getVideoTracks?.()[0];
+        if (!src) { setMsg("카메라를 먼저 켜야 공유할 수 있어요."); setOn(false); return; }
+        // 엔진(#cam) 트랙을 그대로 발행하면 공유 해제 시 LiveKit이 트랙을 stop해
+        // 홈 화면 카메라·감지까지 죽는다(QC2차 #23) → 사본(clone)을 발행해 원본 보존
+        await lp.publishTrack(src.clone(), { source: Track.Source.Camera, name: "posture" });
         setOn(true); setMsg("");
       } else {
         lp.videoTrackPublications.forEach((pub) => { if (pub.track) lp.unpublishTrack(pub.track); });
@@ -141,7 +149,7 @@ function RoomInner({ onClose }) {
       <p className="hint">공유를 켜면 친구들이 내 자세를 실시간으로 봐요. <b>자세 점수(숫자)는 카메라를 안 켜도</b> 서로 보여요. 영상은 LiveKit 서버를 통해 전달돼요.</p>
       <Grid postures={postures} onNudge={sendNudge} cooldown={cooldown} />
       <div className="row" style={{ marginTop: 8 }}>
-        <button onClick={onClose}>그리드 닫기</button>
+        <button onClick={onClose}>공부방 닫기</button>
       </div>
     </>
   );
@@ -170,7 +178,7 @@ export default function GroupGridRoom({ code, onClose }) {
   }, [code]);
 
   if (conn === "unconfigured")
-    return <p className="hint">실시간 그리드는 <b>LiveKit 설정</b> 후 켜져요 (관리자가 키를 등록해야 함). 지금은 준비 중이에요.</p>;
+    return <p className="hint">실시간 공부방은 <b>LiveKit 설정</b> 후 켜져요 (관리자가 키를 등록해야 함). 지금은 준비 중이에요.</p>;
   if (conn === "error")
     return <p className="hint rtc-err">연결 준비에 실패했어요. 잠시 후 다시 시도해주세요.</p>;
   if (!conn) return <p className="hint">연결 중…</p>;

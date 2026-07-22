@@ -151,7 +151,7 @@ function HelpCard() {
       <h2>도움말</h2>
       <p className="hint">앱 사용법 안내를 다시 볼 수 있어요.</p>
       <button type="button" onClick={() => window.dispatchEvent(new Event("pg-show-onboarding"))}>
-        온보딩 다시 보기
+        사용 방법 다시보기
       </button>
     </div>
   );
