@@ -158,16 +158,16 @@ function driftTick(absM, ref, state, now) {
 // 임계값을 이 기기에서만(localStorage pg_tune) 실시간 조정. 배포 불필요, 다른 사용자 무영향.
 // 좋은 값을 찾으면 [값 복사]로 JSON을 공유 → 정식 상수로 반영하는 흐름.
 const TUNE_KNOBS = [
-  { obj: () => TUNE3D, key: "FORWARD_MARGIN",     label: "거북목 시작",        min: 0.05, max: 0.25, step: 0.01 },
-  { obj: () => TUNE3D, key: "FORWARD_FULL",       label: "거북목 램프 폭",     min: 0.05, max: 0.35, step: 0.01 },
-  { obj: () => TUNE3D, key: "TILT_MARGIN_DEG",    label: "어깨기울기 시작(°)", min: 1,    max: 10,   step: 0.5 },
-  { obj: () => TUNE3D, key: "PITCH_MARGIN_DEG",   label: "고개숙임 시작(°)",   min: 20,   max: 50,   step: 1 },
-  { obj: () => TUNE3D, key: "HEAD_DROP_DEADZONE", label: "머리 가라앉음",      min: 0.1,  max: 0.4,  step: 0.01 },
-  { obj: () => TUNE3D, key: "NEAR_DEADZONE",      label: "화면 근접",          min: 0.05, max: 0.3,  step: 0.01 },
-  { obj: () => TUNING, key: "BAD_ENTER_SUSTAIN",  label: "알림까지 지속(초)",  min: 3,    max: 15,   step: 1 },
-  { obj: () => TUNING, key: "AWAY_AFTER",         label: "자리비움 판정(초)",  min: 5,    max: 30,   step: 1 },
-  { obj: () => DRIFT,  key: "HV_DROP",            label: "드리프트: 가라앉음", min: 0.05, max: 0.25, step: 0.01 },
-  { obj: () => DRIFT,  key: "FWD_RISE",           label: "드리프트: 전방",     min: 0.05, max: 0.25, step: 0.01 },
+  { obj: () => TUNE3D, key: "FORWARD_MARGIN",     label: "거북목 시작",        min: 0.02, max: 0.40, step: 0.01 },
+  { obj: () => TUNE3D, key: "FORWARD_FULL",       label: "거북목 램프 폭",     min: 0.03, max: 0.60, step: 0.01 },
+  { obj: () => TUNE3D, key: "TILT_MARGIN_DEG",    label: "어깨기울기 시작(°)", min: 0.5,  max: 20,   step: 0.5 },
+  { obj: () => TUNE3D, key: "PITCH_MARGIN_DEG",   label: "고개숙임 시작(°)",   min: 10,   max: 70,   step: 1 },
+  { obj: () => TUNE3D, key: "HEAD_DROP_DEADZONE", label: "머리 가라앉음",      min: 0.05, max: 0.60, step: 0.01 },
+  { obj: () => TUNE3D, key: "NEAR_DEADZONE",      label: "화면 근접",          min: 0.02, max: 0.60, step: 0.01 },
+  { obj: () => TUNING, key: "BAD_ENTER_SUSTAIN",  label: "알림까지 지속(초)",  min: 1,    max: 30,   step: 1 },
+  { obj: () => TUNING, key: "AWAY_AFTER",         label: "자리비움 판정(초)",  min: 3,    max: 60,   step: 1 },
+  { obj: () => DRIFT,  key: "HV_DROP",            label: "드리프트: 가라앉음", min: 0.02, max: 0.50, step: 0.01 },
+  { obj: () => DRIFT,  key: "FWD_RISE",           label: "드리프트: 전방",     min: 0.02, max: 0.50, step: 0.01 },
 ];
 const tuneDefaults = {};
 TUNE_KNOBS.forEach((k) => { tuneDefaults[k.key] = k.obj()[k.key]; });
