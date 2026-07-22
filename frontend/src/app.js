@@ -651,7 +651,7 @@ function stop() {
   show($("cam-mode-live"), false); // 정지 후엔 시작 화면(start-cta) 토글이 담당
   els.pill.textContent = "꺼짐";
   els.pill.style.background = "#555";
-  els.score.textContent = "score --";
+  els.score.textContent = "";
   els.msg.textContent = "측정이 종료되고 카메라가 꺼졌어요. 다시 켜려면 [카메라 시작]을 누르세요.";
   const ctx = els.track.getContext("2d"); // TRACKING 지우기
   ctx.clearRect(0, 0, els.track.width, els.track.height);
@@ -1101,7 +1101,7 @@ function tick() {
 function renderUI(state, score, zs, now, face) {
   els.pill.textContent = STATE_LABEL[state] || state;
   els.pill.style.background = STATE_COLOR[state];
-  els.score.textContent = score === null ? "score --" : `score ${score.toFixed(1)}`;
+  els.score.textContent = score === null ? "" : `${Math.round(score)}점`;
   els.points.textContent = `${rewards.points}P`;
 
   const badCand = sm.cand?.[0] === "BAD";

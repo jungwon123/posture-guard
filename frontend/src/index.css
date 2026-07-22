@@ -34,7 +34,7 @@
     padding: 3px 12px; border-radius: 999px; font-weight: 700; font-size: 13px;
     background: var(--uncal); color: #101418;
   }
-  #score { font-variant-numeric: tabular-nums; color: var(--dim); }
+  #score { font-variant-numeric: tabular-nums; color: var(--text); font-size: 14px; font-weight: 700; margin-left: -6px; }
   #points {
     padding: 3px 10px; border-radius: 999px; font-size: 13px; font-weight: 700;
     border: 1px solid var(--accent); color: var(--accent); transition: transform .2s;
