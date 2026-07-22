@@ -146,7 +146,7 @@ function RoomInner({ onClose }) {
   return (
     <>
       <ShareToggle />
-      <p className="hint">공유를 켜면 친구들이 내 자세를 실시간으로 봐요. <b>자세 점수(숫자)는 카메라를 안 켜도</b> 서로 보여요. 영상은 LiveKit 서버를 통해 전달돼요.</p>
+      <p className="hint">공유를 켜면 친구들이 내 자세를 실시간으로 봐요. <b>자세 점수(숫자)는 카메라를 안 켜도</b> 서로 보여요.</p>
       <Grid postures={postures} onNudge={sendNudge} cooldown={cooldown} />
       <div className="row" style={{ marginTop: 8 }}>
         <button onClick={onClose}>공부방 닫기</button>
