@@ -8,8 +8,8 @@ export default function Header() {
       <img id="fairy-img" alt="척추요정" title="척추요정" />
       <span id="speech" className="speech"></span>
       <span id="state-pill">준비 중</span>
-      {/* 실시간 자세 점수(0~100) — 상태 칩 옆에 "NN점". 측정 전/자리비움엔 빈 문자열로 숨김 효과 */}
-      <span id="score"></span>
+      {/* 점수는 트래킹 캔버스 우측 상단에 표시 — 헤더에선 숨김(엔진 갱신 대상이라 DOM은 유지) */}
+      <span id="score" style={{ display: "none" }}></span>
       <span id="points">0P</span>
       <span id="blink" style={{ display: "none" }}>--</span>
       <button id="theme-toggle" title="배경 밝게/어둡게">라이트</button>

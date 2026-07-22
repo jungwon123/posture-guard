@@ -158,16 +158,16 @@ function driftTick(absM, ref, state, now) {
 // 임계값을 이 기기에서만(localStorage pg_tune) 실시간 조정. 배포 불필요, 다른 사용자 무영향.
 // 좋은 값을 찾으면 [값 복사]로 JSON을 공유 → 정식 상수로 반영하는 흐름.
 const TUNE_KNOBS = [
-  { obj: () => TUNE3D, key: "FORWARD_MARGIN",     label: "거북목 시작",        min: 0.02, max: 0.40, step: 0.01 },
-  { obj: () => TUNE3D, key: "FORWARD_FULL",       label: "거북목 램프 폭",     min: 0.03, max: 0.60, step: 0.01 },
-  { obj: () => TUNE3D, key: "TILT_MARGIN_DEG",    label: "어깨기울기 시작(°)", min: 0.5,  max: 20,   step: 0.5 },
-  { obj: () => TUNE3D, key: "PITCH_MARGIN_DEG",   label: "고개숙임 시작(°)",   min: 10,   max: 70,   step: 1 },
-  { obj: () => TUNE3D, key: "HEAD_DROP_DEADZONE", label: "머리 가라앉음",      min: 0.05, max: 0.60, step: 0.01 },
-  { obj: () => TUNE3D, key: "NEAR_DEADZONE",      label: "화면 근접",          min: 0.02, max: 0.60, step: 0.01 },
-  { obj: () => TUNING, key: "BAD_ENTER_SUSTAIN",  label: "알림까지 지속(초)",  min: 1,    max: 30,   step: 1 },
-  { obj: () => TUNING, key: "AWAY_AFTER",         label: "자리비움 판정(초)",  min: 3,    max: 60,   step: 1 },
-  { obj: () => DRIFT,  key: "HV_DROP",            label: "드리프트: 가라앉음", min: 0.02, max: 0.50, step: 0.01 },
-  { obj: () => DRIFT,  key: "FWD_RISE",           label: "드리프트: 전방",     min: 0.02, max: 0.50, step: 0.01 },
+  { obj: () => TUNE3D, key: "FORWARD_MARGIN",     label: "거북목 시작",        min: 0,    max: 0.8,  step: 0.01 },
+  { obj: () => TUNE3D, key: "FORWARD_FULL",       label: "거북목 램프 폭",     min: 0.01, max: 1.0,  step: 0.01 },
+  { obj: () => TUNE3D, key: "TILT_MARGIN_DEG",    label: "어깨기울기 시작(°)", min: 0,    max: 45,   step: 0.5 },
+  { obj: () => TUNE3D, key: "PITCH_MARGIN_DEG",   label: "고개숙임 시작(°)",   min: 0,    max: 90,   step: 1 },
+  { obj: () => TUNE3D, key: "HEAD_DROP_DEADZONE", label: "머리 가라앉음",      min: 0,    max: 1.0,  step: 0.01 },
+  { obj: () => TUNE3D, key: "NEAR_DEADZONE",      label: "화면 근접",          min: 0,    max: 1.0,  step: 0.01 },
+  { obj: () => TUNING, key: "BAD_ENTER_SUSTAIN",  label: "알림까지 지속(초)",  min: 0,    max: 60,   step: 1 },
+  { obj: () => TUNING, key: "AWAY_AFTER",         label: "자리비움 판정(초)",  min: 1,    max: 120,  step: 1 },
+  { obj: () => DRIFT,  key: "HV_DROP",            label: "드리프트: 가라앉음", min: 0.01, max: 1.0,  step: 0.01 },
+  { obj: () => DRIFT,  key: "FWD_RISE",           label: "드리프트: 전방",     min: 0.01, max: 1.0,  step: 0.01 },
 ];
 const tuneDefaults = {};
 TUNE_KNOBS.forEach((k) => { tuneDefaults[k.key] = k.obj()[k.key]; });
@@ -1221,12 +1221,22 @@ function drawTracking(state, zs, score) {
     ctx.fillText("[바른자세 기준 등록]을 하면 신호와 가이드가 표시됩니다", 12, h - 20);
   }
 
-  // ── 실시간 점수 (우측 상단) — 헤더와 같은 값, 상태색으로 표시 ──
+  // ── 실시간 점수 (우측 상단) — 상태색으로 표시 ──
   if (score !== null && score !== undefined && !calibrating) {
     ctx.textAlign = "right";
     ctx.fillStyle = stateCol;
     ctx.font = "700 28px sans-serif";
     ctx.fillText(`${Math.round(score)}점`, w - 14, 36);
+    ctx.textAlign = "left";
+  }
+  // ── 눈깜빡임 (점수 아래) — 측정 창 진행 중엔 실시간 횟수, 평시엔 마지막 분당 횟수 ──
+  if (blinkEnabled && !calibrating) {
+    ctx.textAlign = "right";
+    ctx.fillStyle = blinkSampling ? "#e6aa3c" : "#8b98a5";
+    ctx.font = "13px sans-serif";
+    const bl = blinkSampling ? `깜빡임 측정 중 · ${blinkCount}회`
+      : blinkRate !== null ? `깜빡임 ${blinkRate}회/분` : "깜빡임 측정 대기";
+    ctx.fillText(bl, w - 14, 58);
     ctx.textAlign = "left";
   }
 }
