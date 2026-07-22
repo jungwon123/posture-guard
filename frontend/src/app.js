@@ -170,6 +170,7 @@ let nextBlinkAt = 0;            // 다음 측정 예정 시각(초)
 let blinkRate = null;          // 마지막 추정 분당 횟수
 // 얼굴 추론 통합(머리자세 + blink) — 틱당 detectForVideo 1회 공유(중복호출 방지)
 let faceHead = null;           // {pitch,yaw,roll} 최근 머리 자세(도), 얼굴 없으면 null
+let faceIris = null;           // 홍채 가로지름(이미지 정규 단위) — 절대 거리 비율(근접·거북목 게이트)용
 let lastFaceFr = null;         // 이번 틱의 얼굴 결과(runFace가 채움, 없으면 null)
 let lastFaceDetect = 0;        // 머리자세 스로틀 기준(wallMs)
 let faceSeenAt = 0;            // 마지막으로 얼굴이 잡힌 시각(초) — 오래 없으면 pitch 무효화
@@ -578,8 +579,16 @@ function runFace(now, wallMs) {
   catch { lastFaceFr = null; return; }
   lastFaceDetect = wallMs;
   const hp = headPoseFromMatrix(lastFaceFr.facialTransformationMatrixes?.[0]?.data);
+  // 홍채 지름 측정(468-477 랜드마크는 이미 이 모델 출력에 포함 — 추가 추론 비용 0).
+  // 사람 홍채는 ~11.7mm로 일정해, 기준 대비 지름 비율 = 카메라 거리 비율(화각·초점거리 무관).
+  const flm = lastFaceFr.faceLandmarks?.[0];
+  if (flm && flm.length > 477) {
+    const d = (a, b) => Math.hypot(flm[a].x - flm[b].x, flm[a].y - flm[b].y);
+    const ir = (d(469, 471) + d(474, 476)) / 2; // 좌우 눈 홍채 가로지름 평균
+    if (ir > 1e-4) faceIris = ir;
+  }
   if (hp) { faceHead = hp; faceSeenAt = now; }
-  else if (now - faceSeenAt > 1.5) faceHead = null; // 얼굴이 오래 사라지면 pitch 무효화
+  else if (now - faceSeenAt > 1.5) { faceHead = null; faceIris = null; } // 얼굴이 오래 사라지면 무효화
 }
 
 // 주기 샘플링: 평소엔 쉬고, 정해진 시각에 30초간 깜빡임을 센다.
@@ -689,6 +698,11 @@ function tick() {
       // 3D 절대 지표(미터 world 좌표, 추가 추론비용 0) + 얼굴 머리 pitch(있으면). 없으면 null
       const raw3d = extractAbsolute(lastResult.worldLandmarks?.[0]);
       if (raw3d && faceHead) { raw3d.headPitch = faceHead.pitch; raw3d.headRoll = faceHead.roll; }
+      // 홍채 지름 + 이미지 어깨너비 — 근접(절대 거리)·카메라 전진 거북목 게이트 입력
+      if (raw3d) {
+        if (faceIris) raw3d.irisNorm = faceIris;
+        if (camSample) raw3d.camW = camSample.shW;
+      }
       absM = absSmoother.update(raw3d, now);
       lastAbs = absM; // 트래킹 각도 수치 표시용
     } catch {}
@@ -803,7 +817,9 @@ function tick() {
       latRef: absRef?.headLateral != null ? +absRef.headLateral.toFixed(3) : null,
       roll: absM?.headRoll != null ? +absM.headRoll.toFixed(1) : null,
       rollRef: absRef?.headRoll != null ? +absRef.headRoll.toFixed(1) : null,
-      hand: absM?.handToFace != null ? +absM.handToFace.toFixed(2) : null };
+      hand: absM?.handToFace != null ? +absM.handToFace.toFixed(2) : null,
+      // 홍채 거리 비율(실기기 검증용): irisR = 현재/기준 — 1보다 크면 그만큼 가까워진 것
+      irisR: (absM?.irisNorm != null && absRef?.irisNorm > 0) ? +(absM.irisNorm / absRef.irisNorm).toFixed(3) : null };
 
     if (state !== prev) {
       logTransition(prev, state, now);

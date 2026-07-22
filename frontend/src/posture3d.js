@@ -18,7 +18,8 @@ const MIN_VIS = 0.5;
 // 절대 페널티 가중치 — core z-score 점수에 exp(-penalty)로 곱해 결합한다(0이면 무영향).
 // 공부 특화 재조정: headVertical·pitch 는 '책·화면을 내려보는' 정상 공부 동작에도 같이 반응(오염)하므로
 // 힘을 뺀다. 거북목 판정은 내려보기에 덜 오염된 forward(전방이동)·span(어깨말림)·tilt(어깨기울기)가 담당.
-const ABS_W = { head: 0.7, tilt: 1.4, pitch: 0.25, forward: 1.2, span: 1.4, lateral: 1.0, roll: 0.8, prop: 1.1 }; // head 1.6→0.7·pitch 0.5→0.25: 내려보기 오탐 완화
+const ABS_W = { head: 0.7, tilt: 1.4, pitch: 0.25, forward: 1.2, span: 1.4, lateral: 1.0, roll: 0.8, prop: 1.1,
+  near: 0.9, camfwd: 1.0 }; // near/camfwd = 홍채 비율 기반(얼굴 트래킹 업그레이드) — head 1.6→0.7·pitch 0.5→0.25: 내려보기 오탐 완화
 const HEAD_DROP_DEADZONE = 0.25; // 기준 대비 25% 이상 내려가야 페널티(공부 중 책 보는 정도는 허용 — 0.15→0.25)
 const TILT_MARGIN_DEG = 3;       // 기준 + 3도 초과부터 페널티(더 타이트)
 const TILT_FULL_DEG = 14;        // 14도 초과분에서 가중치 최대
@@ -34,6 +35,13 @@ const ROLL_MARGIN_DEG = 10;      // 고개 갸웃(roll)이 기준서 10도 이�
 const ROLL_FULL_DEG = 30;        // 30도 초과분에서 가중치 최대
 const PROP_NEAR = 0.65;          // 손목이 코에서 어깨너비의 0.65 이내로 오면 '얼굴 괴기' 시작(고정 임계, 실기기 튜닝)
 const PROP_FULL = 0.35;          // 0.35 이내면 가중치 최대
+// 홍채 기반 절대 거리 — 사람 홍채 지름은 ~11.7mm로 거의 일정 → 화면상 홍채 크기의 '기준 대비 비율'이
+// 곧 카메라 거리 비율(초점거리·기기 화각 무관, 캘리브 ref 와의 비율이라 개인차도 상쇄).
+const NEAR_DEADZONE = 0.15;      // 홍채가 기준보다 15% 이상 커져야(=그만큼 가까워져야) 근접 페널티
+const NEAR_FULL = 0.40;          // 40% 초과분에서 최대
+const CAMFWD_DEADZONE = 0.10;    // '얼굴만' 가까워짐(몸통 제외)이 10% 초과부터 거북목 페널티
+const CAMFWD_FULL = 0.30;        // 30% 초과분에서 최대
+const CAMFWD_BODY_GATE = 0.08;   // 이미지상 어깨너비가 8% 이상 커졌으면 몸 전체가 다가온 것 → 거북목 아님(근접이 담당)
 
 // ── One-Euro 필터 (지터는 줄이고 지연은 최소) ──
 class LowPass {
@@ -128,6 +136,8 @@ export class AbsSmoother {
       headLateral: new OneEuro({ minCutoff: 0.8, beta: 0.01 }),   // x축이라 노이즈 적음
       headRoll: new OneEuro({ minCutoff: 0.8, beta: 0.02 }),
       handToFace: new OneEuro({ minCutoff: 0.6, beta: 0.01 }),
+      irisNorm: new OneEuro({ minCutoff: 0.6, beta: 0.01 }),   // 홍채 지름(이미지 정규) — 얼굴 스로틀 주기라 완만히
+      camW: new OneEuro({ minCutoff: 0.6, beta: 0.01 }),       // 이미지상 어깨너비(몸통 근접 게이트용)
     };
   }
   update(m, t) {
@@ -153,6 +163,12 @@ export class AbsSmoother {
     }
     if (m.headPitch != null && Number.isFinite(m.headPitch)) {
       out.headPitch = this.f.headPitch.filter(m.headPitch, t);
+    }
+    if (m.irisNorm != null && Number.isFinite(m.irisNorm) && m.irisNorm > 0) {
+      out.irisNorm = this.f.irisNorm.filter(m.irisNorm, t);
+    }
+    if (m.camW != null && Number.isFinite(m.camW) && m.camW > 0) {
+      out.camW = this.f.camW.filter(m.camW, t);
     }
     return out;
   }
@@ -185,6 +201,12 @@ export function finishAbsRef(samples) {
   if (lats.length >= 3) ref.headLateral = median(lats);
   const rolls = good.map((s) => s.headRoll).filter((v) => v != null && Number.isFinite(v));
   if (rolls.length >= Math.max(3, Math.floor(good.length * 0.3))) ref.headRoll = median(rolls);
+  // 홍채 지름·이미지 어깨너비 기준 — 근접(near)·카메라 전진(camfwd) 게이트용. 얼굴이 캘리브 동안
+  // 충분히 잡혔을 때만 저장(없으면 두 게이트 auto-skip = 기존 사용자·미검출에 무해).
+  const irises = good.map((s) => s.irisNorm).filter((v) => v != null && Number.isFinite(v) && v > 0);
+  if (irises.length >= Math.max(3, Math.floor(good.length * 0.3))) ref.irisNorm = median(irises);
+  const camws = good.map((s) => s.camW).filter((v) => v != null && Number.isFinite(v) && v > 0);
+  if (camws.length >= 3) ref.camW = median(camws);
   // handToFace 는 절대 임계(캘리브 무관) — ref 에 저장하지 않음.
   return ref;
 }
@@ -245,6 +267,25 @@ function tiltTerm(m, ref) {
 }
 
 // 각 절대 신호의 (메시지키, 가중 기여도) 목록. absPenalty(결합)·absDominant(최댓값) 공용 SSoT.
+// 화면 근접(홍채 비율) → 0..1.5. 홍채가 기준보다 커진 만큼(=가까워진 만큼)만 — 절대 거리 기반이라
+// 캘리브 품질·기기 화각과 무관. 멀어지는 건 무시(비대칭).
+function nearTerm(m, ref) {
+  if (m.irisNorm == null || ref.irisNorm == null || !(ref.irisNorm > 0)) return 0;
+  const closer = m.irisNorm / ref.irisNorm - 1 - NEAR_DEADZONE;
+  return closer > 0 ? Math.min(closer / NEAR_FULL, 1.5) : 0;
+}
+
+// 카메라 전진 거북목 → 0..1.5. '얼굴만' 가까워졌을 때(몸통 어깨너비는 그대로) = 머리를 앞으로 뺀 것.
+// 몸 전체가 다가온 경우(이미지 어깨너비도 같이 커짐)는 근접(nearTerm) 담당이므로 게이트로 제외.
+function camForwardTerm(m, ref) {
+  if (m.irisNorm == null || ref.irisNorm == null || !(ref.irisNorm > 0)) return 0;
+  if (m.camW == null || ref.camW == null || !(ref.camW > 0)) return 0;
+  const bodyCloser = m.camW / ref.camW - 1;
+  if (bodyCloser > CAMFWD_BODY_GATE) return 0; // 몸 전체 근접 — 거북목 아님
+  const headCloser = m.irisNorm / ref.irisNorm - 1 - Math.max(bodyCloser, 0) - CAMFWD_DEADZONE;
+  return headCloser > 0 ? Math.min(headCloser / CAMFWD_FULL, 1.5) : 0;
+}
+
 function absContribs(m, ref) {
   return [
     ["head_drop", ABS_W.head * headDropTerm(m, ref)],    // 머리 가라앉음 → 거북목류
@@ -255,6 +296,8 @@ function absContribs(m, ref) {
     ["head_tilt", ABS_W.lateral * lateralTerm(m, ref)],  // 좌우 쏠림
     ["head_tilt", ABS_W.roll * rollTerm(m, ref)],        // 고개 갸웃
     ["hand_face", ABS_W.prop * propTerm(m)],             // 손으로 얼굴 괴기
+    ["proximity", ABS_W.near * nearTerm(m, ref)],        // 화면 근접(홍채 절대 거리 비율)
+    ["head_drop", ABS_W.camfwd * camForwardTerm(m, ref)], // 거북목(얼굴만 카메라 전진, 몸통 게이트)
   ];
 }
 
