@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import Header from "./components/Header.jsx";
 import MainPanels from "./components/MainPanels.jsx";
 import StudyTimer from "./components/StudyTimer.jsx";
+import SubjectChips from "./components/SubjectChips.jsx";
 import TogetherCta from "./components/TogetherCta.jsx";
 import Controls from "./components/Controls.jsx";
 import AttendanceCard from "./components/AttendanceCard.jsx";
@@ -78,6 +79,7 @@ export default function App() {
 
       <div className="page" style={show("main")}>
         <StudyTimer />
+        <SubjectChips />
         <MainPanels />
         <Controls />
         <TogetherCta onGo={() => setPage("group")} />

@@ -507,6 +507,57 @@
   .skin-card { transition: none; }
 }
 
+/* ── P0: 오늘 목표 게이지 · D-Day · 과목 칩 · 캘린더 새싹 배지 ── */
+.sh-dday {
+  margin-left: 8px; padding: 2px 8px; border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 16%, var(--panel));
+  color: var(--accent); font-size: 11.5px; font-weight: 800; letter-spacing: .02em;
+}
+.sh-goal {
+  display: flex; flex-direction: column; gap: 5px; width: 100%;
+  margin-top: 10px; padding: 0; border: 0; background: none; cursor: pointer; text-align: left;
+}
+.sh-goal-bar {
+  display: block; height: 8px; border-radius: 999px; overflow: hidden;
+  background: color-mix(in srgb, var(--line) 60%, var(--panel));
+}
+.sh-goal-fill {
+  display: block; height: 100%; border-radius: 999px; background: var(--accent);
+  transition: width .6s ease;
+}
+.sh-goal-fill.warn { background: #d9a13c; } /* 자세 70% 미만 — 시간은 차는데 자세가 무너지는 중 */
+.sh-goal-fill.done { background: var(--accent); }
+.sh-goal-text { font-size: 12px; color: var(--dim); font-weight: 600; }
+.sh-goal-edit { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.sh-goal-label { font-size: 12px; color: var(--dim); font-weight: 600; }
+.sh-goal-preset {
+  padding: 5px 12px; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--panel); color: var(--text); font-size: 12.5px; font-weight: 700; cursor: pointer;
+}
+.sh-goal-preset:active { transform: scale(.96); }
+.sh-goal-preset.sub { color: var(--dim); }
+/* 과목 칩 바 — 타이머 아래, 과목색 닷 + 활성 칩은 과목색 워시 */
+.subj-bar { display: flex; flex-wrap: wrap; gap: 7px; margin: 10px 16px 0; }
+.subj-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--panel); color: var(--text); font-size: 13px; font-weight: 700; cursor: pointer;
+}
+.subj-chip .subj-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--subj, var(--dim)); }
+.subj-chip.on {
+  border-color: color-mix(in srgb, var(--subj) 55%, var(--line));
+  background: color-mix(in srgb, var(--subj) 14%, var(--panel));
+}
+.subj-chip:active { transform: scale(.96); }
+.subj-add { color: var(--dim); font-weight: 800; padding: 6px 11px; }
+.subj-add-input {
+  width: 84px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--panel); color: var(--text); font-size: 13px;
+}
+/* 캘린더 자세 우수일 새싹 */
+.cal-day { position: relative; }
+.cal-sprout { position: absolute; top: 2px; right: 2px; width: 11px; height: 8px; object-fit: contain; opacity: .9; }
+
 /* ── 요정 UI 에셋 (숲 배경 · 페이지 배너 · 버튼) ── */
 #app-bg {
   position: fixed; inset: 0; z-index: -1; pointer-events: none;

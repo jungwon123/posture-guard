@@ -34,6 +34,8 @@ export function collectData() {
       days: jparse("pg_attend_days", []),
       last: localStorage.getItem("pg_attend_last") || null,
     },
+    goal: jparse("pg_goal", null),         // 오늘 목표(시간·자세%·D-Day) — P0
+    subjects: jparse("pg_subjects", null), // 과목 사전(이름·색) — P0. 과목 로그는 로컬 온리(P1에서 서버화)
   };
 }
 
@@ -46,6 +48,8 @@ export function restoreData(data) {
     if (Array.isArray(data.att.days)) localStorage.setItem("pg_attend_days", JSON.stringify(data.att.days));
     if (data.att.last) localStorage.setItem("pg_attend_last", String(data.att.last));
   }
+  if (data.goal && typeof data.goal === "object") localStorage.setItem("pg_goal", JSON.stringify(data.goal));
+  if (Array.isArray(data.subjects)) localStorage.setItem("pg_subjects", JSON.stringify(data.subjects));
 }
 
 // ── 부팅 병합 (이미 로그인된 상태) — 단순 max/합집합 병합 후 로컬에 기록, 병합 결과를 반환.
@@ -61,10 +65,14 @@ export function mergeData(server) {
     points,
     shop: { ...server.shop, ...local.shop, owned, skin },
     att: { days, last: local.att.last || server.att?.last || null },
+    // 목표·과목: 최신 수정 우선(goal은 updatedAt 비교), 과목은 로컬 우선(없으면 서버)
+    goal: (local.goal?.updatedAt || 0) >= (server.goal?.updatedAt || 0) ? local.goal : server.goal,
+    subjects: local.subjects || server.subjects || null,
   };
   const changed = points !== local.points
     || owned.length !== (local.shop.owned || []).length
-    || days.length !== (local.att.days || []).length;
+    || days.length !== (local.att.days || []).length
+    || (!local.goal && !!server.goal) || (!local.subjects && !!server.subjects);
   if (changed) restoreData(merged);
   return { data: merged, changed };
 }
@@ -210,5 +218,6 @@ export function wipeLocalData() {
   ["pg_events", "pg_daily", "pg_points", "pg_today", "pg_shop",
    "pg_attend_days", "pg_attend_last", "pg_last_active", "pg_profile",
    "pg_blink", "pg_blink_log", "pg_group", "pg_groups", "pg_entered",
+   "pg_goal", "pg_goal_award_last", "pg_subjects", "pg_subj_log", "pg_daily_subj",
   ].forEach((k) => localStorage.removeItem(k));
 }

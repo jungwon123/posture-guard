@@ -8,7 +8,8 @@ import {
 import { AbsSmoother, extractAbsolute, finishAbsRef, absPenalty, absDominant, headPoseFromMatrix,
   extractGuidePoints, finishGuide, projectGuide } from "./posture3d.js";
 import { Rewards, MELODIES, SKINS, SHOP, TIERS, computeReport, hurtMotion } from "./reward.js";
-import { getAuth, syncPull, mergeData, startSyncLoop, writeDailySnapshot, pushDaily } from "./sync.js";
+import { getAuth, syncPull, mergeData, startSyncLoop, writeDailySnapshot, pushDaily, localDateStr } from "./sync.js";
+import { computeSubjects, readSubjLog, readSubjects, writeDailySubjSnapshot } from "./subjects.js";
 
 // React 마운트 후 1회 실행 (엔진 계층 — 카메라 루프·판정·알림·PiP)
 let __started = false;
@@ -447,6 +448,7 @@ async function start() {
 // 카메라 끄기 — 웹캠 트랙을 정지해 카메라 불이 꺼지고 감지가 멈춘다.
 function stop() {
   writeDailySnapshot(computeReport(events, dayStartSec(), nowSec())); // 오늘 일별 집계 스냅샷(캘린더)
+  writeDailySubjSnapshot(localDateStr(), computeSubjects(events, readSubjLog(), dayStartSec(), nowSec())); // 과목별(P0)
   // 열린 GOOD/BAD 세그먼트를 지금 시점에 닫아, 정지 후에도 시간이 계속 누적되지 않게 함.
   if (running && ["GOOD", "CAUTION", "BAD"].includes(sm.state)) { logTransition(sm.state, "AWAY", nowSec()); sm.state = "AWAY"; }
   running = false;
@@ -1202,6 +1204,15 @@ function openReport() {
   ];
   if (blinkEnabled || bt.n) // 눈 깜빡임: 오늘 평균(분당). 정상 15~20
     rows.push(["오늘 평균 깜빡임", bt.n ? `분당 ${bt.avg}회 (정상 ${BLINK_NORMAL_LO}~${BLINK_NORMAL_HI})` : "아직 측정 전"]);
+  // 과목별(P0) — 오늘 (착석상태 × 과목) 교집합 상위 4개: "국어 할 때 자세가 무너진다"가 보이는 유일한 리포트
+  {
+    const subj = computeSubjects(events, readSubjLog(), dayStartSec(), nowSec());
+    const names = Object.fromEntries(readSubjects().map((s) => [s.id, s.name]));
+    Object.entries(subj).filter(([id, v]) => id !== "_none" && v.watched >= 60)
+      .sort((a, b) => b[1].watched - a[1].watched).slice(0, 4)
+      .forEach(([id, v]) => rows.push([`과목 · ${names[id] || "삭제된 과목"}`,
+        `${(v.watched / 60).toFixed(0)}분 · 바른자세 ${Math.round((v.good / v.watched) * 100)}%`]));
+  }
   rows.push(["오늘 얻은 포인트", `+${todayEarned}P`]);
   els.reportTable.innerHTML = rows.map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join("");
   els.reportGrade.textContent = rep.grade;
@@ -1685,7 +1696,12 @@ $("equip-grid")?.addEventListener("click", (e) => {
 // ── 초기화 ──
 initSettings();
 // 일별 집계 스냅샷 — 측정 중 1분 주기(캘린더 데이터, 이벤트 캡과 무관하게 보존)
-setInterval(() => { if (running) writeDailySnapshot(computeReport(events, dayStartSec(), nowSec())); }, 60_000);
+setInterval(() => {
+  if (!running) return;
+  writeDailySnapshot(computeReport(events, dayStartSec(), nowSec()));
+  // 과목별 스냅샷(P0) — 2000건 캡 유실 대비, pg_daily와 같은 max 병합 패턴
+  writeDailySubjSnapshot(localDateStr(), computeSubjects(events, readSubjLog(), dayStartSec(), nowSec()));
+}, 60_000);
 
 renderShop();
 renderSummary();
@@ -1773,6 +1789,16 @@ if (themeBtn) themeBtn.onclick = () =>
 
 // 그룹 그리드에서 친구가 "자세 콕!"을 보내면(LiveKit 데이터) → 최상단 배너 + 진동 + 소리
 window.addEventListener("pg-nudge", (e) => showNudge(e?.detail?.from));
+
+// 오늘 목표 달성(P0) — StudyTimer가 이중 목표(시간+자세 70%) 판정 후 1일 1회 이벤트로 위임.
+window.addEventListener("pg-goal-achieved", () => {
+  rewards._earn(30, dateStr()); // 보너스 +30P (일일 적립 집계에 포함)
+  els.points.textContent = `${rewards.points}P`;
+  flashPoints();
+  praiseUntil = nowSec() + 4; // 요정 칭찬 모션
+  centerPop(`<div class="cp-title">오늘 목표 달성!</div><div class="cp-sub">나와의 약속을 지켰어요 · 보너스 +30P</div>`, 3200);
+  speak("오늘 목표 달성! 정말 멋져요");
+});
 
 // ── 홈 화면 설치 안내 ──
 // 완전 자동 설치는 어떤 브라우저도 불가(악용 방지). 안드로이드/데스크톱은 네이티브 설치 프롬프트,

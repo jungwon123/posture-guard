@@ -71,6 +71,8 @@ export default function CalendarCard() {
           const r = data[key];
           const level = r?.watched ? Math.min(1, r.watched / (4 * 3600)) : 0; // 4시간이면 최고 농도
           const future = key > today;
+          // 자세 우수일(30분+ 공부 & 바른자세 80%+) — 히트맵 농도에 새싹 배지 추가 (P0)
+          const greatPosture = r?.watched >= 1800 && r.good / r.watched >= 0.8;
           return (
             <button type="button" key={key} disabled={future}
               className={`cal-day${key === sel ? " sel" : ""}${key === today ? " today" : ""}`}
@@ -78,6 +80,7 @@ export default function CalendarCard() {
               onClick={() => setSel(key)}>
               <span className="cal-num">{d}</span>
               <span className="cal-min">{fmtShort(r?.watched)}</span>
+              {greatPosture && <img className="cal-sprout" src="/assets/ui/ui-sprout.png" alt="자세 우수" />}
             </button>
           );
         })}
