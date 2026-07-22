@@ -1054,7 +1054,7 @@ function renderUI(state, score, zs, now, face) {
   els.camPanel.classList.toggle("bad-hard", state === "BAD" && dur >= TUNING.ESCALATE_NOTIFY);
   els.camPanel.classList.toggle("vignette", state === "BAD" && dur >= TUNING.ESCALATE_VIGNETTE);
 
-  drawTracking(state, zs);
+  drawTracking(state, zs, score);
   drawMini(state, score, face, badCand, now);
   updateDocPip(state, score, now);
 }
@@ -1095,7 +1095,7 @@ const KEYPT = { [LM.NOSE]: "#e6763c", [LM.EAR_L]: "#e6aa3c", [LM.EAR_R]: "#e6aa3
 // 신호 이름 → 쉬운 한국어 (트래킹 막대 라벨)
 const SIGNAL_KR = { proximity: "화면 거리", pitch: "고개 숙임", shoulder_roll: "어깨 말림" };
 
-function drawTracking(state, zs) {
+function drawTracking(state, zs, score) {
   const ctx = els.track.getContext("2d");
   const { width: w, height: h } = els.track;
   ctx.fillStyle = "#14181d"; ctx.fillRect(0, 0, w, h);
@@ -1219,6 +1219,15 @@ function drawTracking(state, zs) {
   } else if (!judge) {
     ctx.fillStyle = "#8b98a5"; ctx.font = "13px sans-serif";
     ctx.fillText("[바른자세 기준 등록]을 하면 신호와 가이드가 표시됩니다", 12, h - 20);
+  }
+
+  // ── 실시간 점수 (우측 상단) — 헤더와 같은 값, 상태색으로 표시 ──
+  if (score !== null && score !== undefined && !calibrating) {
+    ctx.textAlign = "right";
+    ctx.fillStyle = stateCol;
+    ctx.font = "700 28px sans-serif";
+    ctx.fillText(`${Math.round(score)}점`, w - 14, 36);
+    ctx.textAlign = "left";
   }
 }
 
