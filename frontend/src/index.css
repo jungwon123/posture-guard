@@ -1192,12 +1192,3 @@ body:has(#report-overlay.open) .buddy-bubble-wrap { display: none !important; }
 #tune-foot button:hover { border-color: var(--accent); color: var(--accent); }
 #tune-panel.min #tune-body, #tune-panel.min #tune-foot { display: none; }
 
-/* 카메라 배치 모드 토글 (시작 화면 + 측정 중 컨트롤 줄) */
-.cam-mode { display: flex; gap: 6px; margin-top: 2px; }
-#cam-mode-live { display: none; margin-top: 0; margin-left: 2px; } /* 측정 중에만 엔진이 표시 */
-#cam-mode-live button { padding: 7px 13px; }
-.cam-mode button {
-  padding: 6px 16px; border-radius: 999px; font-size: 12.5px; cursor: pointer;
-  border: 1px solid var(--line); background: transparent; color: var(--dim); transition: all .15s;
-}
-.cam-mode button.on { border-color: var(--accent); color: var(--accent); font-weight: 700; }
