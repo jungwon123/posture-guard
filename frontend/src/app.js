@@ -6,7 +6,7 @@ import {
 } from "./core.js";
 // 3D 절대 지표 레이어 — 개인 z-score 위에 "거리에 강한 + 절대 바른자세" 게이트를 얹는다(core 무수정).
 import { AbsSmoother, extractAbsolute, finishAbsRef, absPenalty, absDominant, headPoseFromMatrix,
-  extractGuidePoints, finishGuide, projectGuide } from "./posture3d.js";
+  extractGuidePoints, finishGuide, projectGuide, computeDrift } from "./posture3d.js";
 import { Rewards, MELODIES, SKINS, SHOP, TIERS, computeReport, hurtMotion } from "./reward.js";
 import { getAuth, syncPull, mergeData, startSyncLoop, writeDailySnapshot, pushDaily, localDateStr, recalcTodaySnapshot } from "./sync.js";
 import { computeSubjects, readSubjLog, readSubjects, writeDailySubjSnapshot } from "./subjects.js";
@@ -111,6 +111,37 @@ let absSmoother = new AbsSmoother(); // 3D 지표 One-Euro
 let absRef = null;                   // 유도 캘리브로 잡은 "바른 자세" 절대 기준
 let absCalibSamples = [];            // 캘리브 중 절대 지표 수집
 let lastAbs = null;                  // 최근 절대 지표(트래킹 수치 표시용)
+
+// ── 슬로우 드리프트 감지 상태 — 수 분에 걸쳐 서서히 무너지는 자세(임계값 아래 잠행)를 잡는다 ──
+const DRIFT = {
+  SAMPLE_GAP: 2,   // 2초마다 1샘플
+  WIN: 360,        // 6분 창
+  MIN_SPAN: 180,   // 최소 3분 쌓여야 판정
+  HV_DROP: 0.12,   // 기준 대비 12% 가라앉는 추세면 발화 (headVertical 데드존 25%의 절반 — 잠행 구간)
+  FWD_RISE: 0.10,  // 전방이동 +0.10 추세면 발화 (감점 시작 0.13 직전의 잠행 구간)
+  COOLDOWN: 300,   // 한 번 알려주면 5분 쉼
+};
+let driftBuf = [];          // [{t, hv, fwd}]
+let driftLastSample = 0, driftLastNudge = 0, lastDrift = null;
+function resetDrift() { driftBuf = []; lastDrift = null; }
+function driftTick(absM, ref, state, now) {
+  if (!absM || !ref?.headVertical || state === "AWAY" || state === "UNCALIBRATED") { if (state === "AWAY") resetDrift(); return; }
+  if (now - driftLastSample < DRIFT.SAMPLE_GAP) return;
+  driftLastSample = now;
+  driftBuf.push({ t: now, hv: absM.headVertical, fwd: absM.headForward });
+  while (driftBuf.length && driftBuf[0].t < now - DRIFT.WIN) driftBuf.shift();
+  if (!driftBuf.length || now - driftBuf[0].t < DRIFT.MIN_SPAN) return;
+  const d = computeDrift(driftBuf, ref.headVertical);
+  if (!d) return;
+  lastDrift = { hv: +d.hvDrop.toFixed(3), fwd: +d.fwdRise.toFixed(3) };
+  if (d.hvDrop < DRIFT.HV_DROP && d.fwdRise < DRIFT.FWD_RISE) return;
+  if (state === "BAD") return;                    // 이미 경고 중 — 중복 잔소리 금지
+  if (now - driftLastNudge < DRIFT.COOLDOWN) return;
+  driftLastNudge = now;
+  resetDrift();                                    // 같은 추세로 재발화 방지
+  speak("조금씩 무너지고 있어요 — 허리 한 번 펴볼까요?");
+  showToast("자세가 서서히 무너지는 중이에요. 잠깐 고쳐 앉아요");
+}
 let guideRef = null;                 // 트래킹 고스트 가이드(바른 머리위치, 어깨프레임)
 let guideCalibSamples = [];          // 캘리브 중 가이드 좌표 수집
 let camRef = null;                   // 캘리브 시점 카메라 프레이밍(어깨너비·어깨중심Y, 이미지 정규좌표) — 카메라 이동 감지 기준
@@ -468,6 +499,7 @@ async function start() {
   }
   show(els.camRetry, false); // 이전 시작 실패 안내가 남아있으면 정리
   resetCamRetryText();
+  resetDrift(); // 지난 세션의 드리프트 창 폐기
   running = true;
   sessionStartSec = nowSec(); // 세션 타이머 기준
   els.btnStart.textContent = "공부 종료";
@@ -790,6 +822,7 @@ function tick() {
           judge = new Judge(p);
           smoother = new SignalSmoother();
           absSmoother = new AbsSmoother();
+      resetDrift(); // 새 기준 = 드리프트 창도 새로
           sm = new StateMachine(); sm.state = "GOOD";
           // 재등록 시 이전 경고·에스컬레이션 상태 초기화(사용 시간 기록은 유지)
           escStep = 0; praiseUntil = 0; rewardUntil = 0; camMoveHits = 0;
@@ -824,6 +857,7 @@ function tick() {
     const dur = sm.stateSince ? now - sm.stateSince : 0;
     const badCand = sm.cand?.[0] === "BAD";
     const face = rewards.fairy(state, dur, badCand);
+    driftTick(absM, absRef, state, now); // 슬로우 드리프트 — 임계값 아래로 서서히 무너지는 추세 감지
 
     // 라이브 자세 노출 — 돌아다니는 요정 도우미(Buddy)가 읽어 문제 부위를 말풍선으로 콕 짚어줌
     // 말풍선용 worst = '가장 크게 감점 중인' 신호. core z-score와 절대 게이트의 '가중 기여도'를
@@ -856,6 +890,7 @@ function tick() {
     window.__pgLive = { running: true, state, score, worst, dur, ts: now, sessionStart: sessionStartSec,
       pitch: faceHead ? Math.round(faceHead.pitch) : null, // 실기기 부호 확인·디버그용
       absOn: !!(absRef && absM),                            // 절대 게이트(어깨기울기·거북목·머리각) 작동 여부
+      drift: lastDrift,                                     // 슬로우 드리프트 {hv, fwd} — ?fwd=1 디버그·실기기 튜닝용
       absPen: (absRef && absM) ? +absPenalty(absM, absRef).toFixed(2) : null, // 총 절대 페널티
       // 전방머리(거북목)
       fwd: absM?.headForward != null ? +absM.headForward.toFixed(3) : null,

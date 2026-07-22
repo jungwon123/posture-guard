@@ -333,6 +333,24 @@ export function absWorst(m, ref) {
   return absDominant(m, ref)?.key ?? null;
 }
 
+// ── 슬로우 드리프트 감지 (순수 계산) ──
+// 실제 슬라우치는 급락이 아니라 수 분에 걸쳐 서서히 무너지는 패턴 — 순간값+임계값이 놓치는 맹점.
+// 창 전/후반 평균 비교(회귀보다 단순·이상치에 강건): hvDrop = 머리가 가라앉는 중(+), fwdRise = 앞으로 나가는 중(+).
+export function computeDrift(samples, refHV) {
+  if (!samples || samples.length < 10 || !(refHV > 0)) return null;
+  const half = Math.floor(samples.length / 2);
+  const avg = (arr, k) => {
+    const v = arr.map((x) => x[k]).filter(Number.isFinite);
+    return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
+  };
+  const a = samples.slice(0, half), b = samples.slice(half);
+  const hvA = avg(a, "hv"), hvB = avg(b, "hv");
+  const hvDrop = hvA != null && hvB != null ? (hvA - hvB) / refHV : 0;
+  const fA = avg(a, "fwd"), fB = avg(b, "fwd");
+  const fwdRise = fA != null && fB != null ? fB - fA : 0;
+  return { hvDrop, fwdRise };
+}
+
 // ── 트래킹 고스트 가이드용 2D 기하 (판정과 무관, 렌더 전용) ──
 // 어깨 프레임: 원점=어깨중점, 기저 u=(오른어깨-왼어깨), v=u를 90° 회전. 점 P를 P=shMid+a·u+b·v 로 표현.
 // a,b 는 어깨너비 단위(무차원)라 카메라 거리/좌우이동/어깨 기울기에 불변 → 캘리브 때의 '바른 머리
