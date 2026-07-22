@@ -1,0 +1,80 @@
+name: posture-guard
+
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - certbot-etc:/etc/letsencrypt:ro
+      - certbot-web:/var/www/certbot
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # host 네트워크로 뜨는 livekit(7880) 프록시용
+    depends_on: [api]
+
+  api:
+    build: ../backend-vm
+    restart: unless-stopped
+    ports: ["127.0.0.1:8080:8080"] # 호스트 로컬 디버그용 (외부 노출은 nginx만)
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8080
+      DATABASE_URL: postgres://pg:${POSTGRES_PASSWORD}@db:5432/pg
+      REDIS_URL: redis://redis:6379
+      LIVEKIT_URL: ${LIVEKIT_URL}
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET}
+      LIVEKIT_SELF_URL: ${LIVEKIT_SELF_URL}
+      LIVEKIT_SELF_KEY: ${LIVEKIT_SELF_KEY}
+      LIVEKIT_SELF_SECRET: ${LIVEKIT_SELF_SECRET}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_started }
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: pg
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: pg
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pg -d pg"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # 캐시·presence 전용 — 영속화 없음, 64MB 상한 + LRU (e2-small 2GB 배려)
+    command: ["redis-server", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru", "--save", "", "--appendonly", "no"]
+
+  # UDP 대역(50000-50200) 때문에 host 네트워크 — VM 전용 프로필 (Mac Docker Desktop은 host 네트워크 미지원)
+  livekit:
+    image: livekit/livekit-server:v1.13.4
+    restart: unless-stopped
+    profiles: ["vm"]
+    network_mode: host
+    command: ["--config", "/etc/livekit.yaml"]
+    environment:
+      LIVEKIT_KEYS: "${LIVEKIT_SELF_KEY}: ${LIVEKIT_SELF_SECRET}"
+    volumes:
+      - ./livekit/livekit.yaml:/etc/livekit.yaml:ro
+
+  # 인증서 발급/갱신 전용 — `docker compose --profile certs run --rm certbot ...`
+  certbot:
+    image: certbot/certbot
+    profiles: ["certs"]
+    volumes:
+      - certbot-etc:/etc/letsencrypt
+      - certbot-web:/var/www/certbot
+
+volumes:
+  pgdata:
+  certbot-etc:
+  certbot-web:

@@ -4,6 +4,7 @@ import express from "express";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
 import pg from "pg";
+import { createClient } from "redis";
 import http from "http";
 import https from "https"; // 구글 tokeninfo 폴백 (글로벌 fetch 없는 구버전 노드)
 import crypto from "crypto";
@@ -11,6 +12,19 @@ import { attachSignaling } from "./signaling.js";
 import { AccessToken } from "livekit-server-sdk";
 
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 10 });
+
+// Redis(선택) — presence 저장 + 리더보드 캐시. REDIS_URL 미설정·장애 시 기존 DB·메모리 경로로 그대로 동작.
+const redis = process.env.REDIS_URL
+  ? createClient({ url: process.env.REDIS_URL, socket: { reconnectStrategy: (n) => Math.min(500 * (n + 1), 5000) } })
+  : null;
+if (redis) {
+  let warned = false;
+  redis.on("error", (e) => { if (!warned) { warned = true; console.error("redis unavailable:", e.message); } });
+  redis.on("ready", () => console.log("redis connected"));
+  redis.connect().catch(() => {});
+}
+const redisReady = () => !!redis?.isReady;
+const rTry = async (fn) => { try { return await fn(); } catch { return null; } }; // 장애 순간엔 null → 폴백 경로
 
 // 스키마 보장 (첫 기동 시 1회)
 await pool.query(`
@@ -85,6 +99,7 @@ const CORS_ALLOW = [
   /^https:\/\/posture-guard-[a-z0-9]+-jungwons-projects-[a-z0-9]+\.vercel\.app$/, // 배포/프리뷰 URL(팀 스코프)
   /^http:\/\/localhost:\d+$/,                                                // 로컬 개발
 ];
+app.set("trust proxy", 1); // nginx 뒤에서 X-Forwarded-For의 실제 클라이언트 IP로 rate limit
 app.use(cors({
   origin: (origin, cb) => {
     if (!origin) return cb(null, true); // 서버-서버·curl(Origin 없음) 허용
@@ -204,12 +219,22 @@ app.post("/api/stats", async (req, res) => {
 
 // 내 현재 자세 상태 업로드 (엔진이 30초마다) — 그룹 친구들이 상태 점으로 본다
 const STATES = new Set(["GOOD", "BAD", "AWAY", "UNCALIBRATED"]);
+const PRESENCE_TTL_SEC = 90; // 클라 30초 주기 × 3 여유 — 갱신이 끊기면 TTL 만료 = 자동 오프라인
 app.post("/api/presence", async (req, res) => {
   const memberId = (req.body?.memberId || "").trim();
   const state = (req.body?.state || "").trim();
   const skin = cleanSkin((req.body?.skin || "").trim());
   if (!isUuid(memberId)) return bad(res, 400, "잘못된 기기 ID");
   if (!STATES.has(state)) return bad(res, 400, "잘못된 상태");
+  if (redisReady()) {
+    // 멤버 검증은 DB(미가입 UUID 키 적재 방지), 상태 저장은 Redis TTL 키
+    const m = await pool.query("SELECT 1 FROM members WHERE id = $1", [memberId]);
+    if (!m.rows.length) return bad(res, 404, "먼저 그룹에 참여해주세요");
+    const ok = await rTry(() =>
+      redis.setEx(`presence:${memberId}`, PRESENCE_TTL_SEC, JSON.stringify({ state, skin, at: Date.now() })));
+    if (ok !== null) return res.json({ ok: true });
+    // setEx 실패(장애 전환 순간) → 아래 DB 경로로 폴백
+  }
   const r = await pool.query(
     `INSERT INTO presence (member_id, state, skin, updated_at)
      SELECT $1, $2, $3, now() WHERE EXISTS (SELECT 1 FROM members WHERE id = $1)
@@ -257,8 +282,13 @@ app.get("/api/leaderboard", async (req, res) => {
   if (!/^[A-Z2-9]{6}$/.test(code)) return bad(res, 400, "코드는 6자리예요");
   if (!isWeek(week)) return bad(res, 400, "week 형식은 YYYY-MM-DD");
   const key = `${code}:${week}`;
-  const c = boardCache.get(key);
-  if (c && Date.now() - c.at < BOARD_TTL_MS) return res.json({ rows: c.rows, champions: c.champions });
+  if (redisReady()) {
+    const hit = await rTry(() => redis.get(`board:${key}`));
+    if (hit) return res.json(JSON.parse(hit));
+  } else {
+    const c = boardCache.get(key);
+    if (c && Date.now() - c.at < BOARD_TTL_MS) return res.json({ rows: c.rows, champions: c.champions });
+  }
 
   const g = await pool.query("SELECT id FROM groups WHERE code = $1", [code]);
   if (!g.rows.length) return res.json({ rows: [], champions: [] });
@@ -277,6 +307,17 @@ app.get("/api/leaderboard", async (req, res) => {
      WHERE ms.group_id = $1 ORDER BY good_sec DESC, points DESC, ms.created_at ASC LIMIT 100`,
     [gid, week]);
 
+  // presence의 최신 진실은 Redis(TTL 만료 = 오프라인). Redis 없으면 JOIN해 온 DB 값 그대로.
+  if (redisReady() && rows.length) {
+    const vals = await rTry(() => redis.mGet(rows.map((r) => `presence:${r.member_id}`)));
+    if (vals) rows.forEach((r, i) => {
+      const p = vals[i] ? JSON.parse(vals[i]) : null;
+      r.state = p ? p.state : null;
+      r.skin = p ? p.skin : (r.skin || "fairy");
+      r.ago_sec = p ? Math.max(0, Math.round((Date.now() - p.at) / 1000)) : null;
+    });
+  }
+
   // 이번 주 1위를 명예의 전당에 기록(멱등 upsert). 캐시 미스 때만 → 쓰기 자연 throttle.
   if (rows.length && rows[0].good_sec > 0) {
     await pool.query(
@@ -293,8 +334,12 @@ app.get("/api/leaderboard", async (req, res) => {
      WHERE group_id = $1 AND week < $2 ORDER BY week DESC LIMIT 5`, [gid, week]);
   const champions = champs.rows;
 
-  boardCache.set(key, { at: Date.now(), rows, champions });
-  if (boardCache.size > 5000) boardCache.clear();
+  if (redisReady()) {
+    await rTry(() => redis.setEx(`board:${key}`, Math.round(BOARD_TTL_MS / 1000), JSON.stringify({ rows, champions })));
+  } else {
+    boardCache.set(key, { at: Date.now(), rows, champions });
+    if (boardCache.size > 5000) boardCache.clear();
+  }
   return res.json({ rows, champions });
 });
 
@@ -584,4 +629,5 @@ app.post("/api/daily-pull", async (req, res) => {
 const server = http.createServer(app);
 attachSignaling(server, pool); // (기존 mesh) WebRTC 시그널링 /ws
 const port = process.env.PORT || 8080;
-server.listen(port, "127.0.0.1", () => console.log(`posture-guard-api (pg) on :${port}`));
+const host = process.env.HOST || "127.0.0.1"; // 컨테이너에선 HOST=0.0.0.0 (nginx가 앞단)
+server.listen(port, host, () => console.log(`posture-guard-api (pg) on ${host}:${port}`));
