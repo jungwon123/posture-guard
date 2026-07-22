@@ -20,7 +20,8 @@ services:
     environment:
       HOST: 0.0.0.0
       PORT: 8080
-      DATABASE_URL: postgres://pguser:${POSTGRES_PASSWORD}@db:5432/posture
+      # DB = Cloud SQL (관리형) — 전체 URL을 .env의 DATABASE_URL로 주입
+      DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: redis://redis:6379
       LIVEKIT_URL: ${LIVEKIT_URL}
       LIVEKIT_API_KEY: ${LIVEKIT_API_KEY}
@@ -30,23 +31,10 @@ services:
       LIVEKIT_SELF_SECRET: ${LIVEKIT_SELF_SECRET}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
     depends_on:
-      db: { condition: service_healthy }
       redis: { condition: service_started }
 
-  db:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: pguser
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: posture
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U pguser -d posture"]
-      interval: 5s
-      timeout: 3s
-      retries: 12
+  # 로컬 postgres 컨테이너는 Cloud SQL 이전(2026-07-23)으로 제거.
+  # 롤백용 데이터 볼륨 posture-guard_pgdata 는 남아있음 — 지우지 말 것.
 
   redis:
     image: redis:7-alpine

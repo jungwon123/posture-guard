@@ -2,7 +2,7 @@
 // Cloud Run/Firestore 버전(backend/)을 DB만 Postgres로 교체. API 계약은 동일.
 import express from "express";
 import cors from "cors";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import pg from "pg";
 import { createClient } from "redis";
 import http from "http";
@@ -109,9 +109,9 @@ app.use(cors({
 // 요청에 memberId/token이 있으면 그 단위로, 없으면 IP로 제한.
 app.use("/api/", rateLimit({
   windowMs: 60_000, max: 120, standardHeaders: true, legacyHeaders: false,
-  validate: { keyGeneratorIpFallback: false },
+  // memberId/token 우선(학교 NAT 공유 IP 대비), 없으면 IP — ipKeyGenerator가 IPv6를 /56 단위로 정규화
   keyGenerator: (req) =>
-    req.body?.memberId || req.body?.token || req.query?.memberId || req.ip,
+    req.body?.memberId || req.body?.token || req.query?.memberId || ipKeyGenerator(req.ip),
 }));
 const createLimiter = rateLimit({ windowMs: 3600_000, max: 10, standardHeaders: true, legacyHeaders: false,
   message: { error: "그룹 생성이 너무 잦아요 — 잠시 후 다시 시도해주세요" } });

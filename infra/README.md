@@ -1,4 +1,10 @@
-# infra — Docker Compose 스택 (nginx + pgapi + Postgres + Redis + LiveKit)
+# infra — Docker Compose 스택 (nginx + pgapi + Redis) + Cloud SQL
+
+> **DB는 Cloud SQL(관리형 Postgres 16, `pg-cloudsql`, db-f1-micro/HDD 10GB)로 이전(2026-07-23).**
+> - 접속: `.env`의 `DATABASE_URL`(전체 URL). 접근 제어 = Cloud SQL authorized networks(pg-api-vm 외부 IP만 허용).
+> - 백업: 수동 `pg_dump` 대신 Cloud SQL 자동 백업 사용 가능(콘솔). 수동 덤프: `docker run --rm postgres:16-alpine pg_dump "<DATABASE_URL>" > dump.sql`
+> - 롤백: 로컬 볼륨 `posture-guard_pgdata`가 남아있음 — compose에 db 서비스 복원 + DATABASE_URL 되돌리면 이전 상태로 복귀.
+> - LiveKit SFU는 전용 미디어 VM(`lk-sfu-vm`, `infra-lk/`)에서 운영.
 
 ```
 인터넷 → nginx(80/443, TLS·rate limit) ─┬→ api(Express) ─┬→ db(Postgres 16)
