@@ -21,12 +21,14 @@ const MIN_VIS = 0.5;
 const ABS_W = { head: 0.7, tilt: 1.4, pitch: 0.25, forward: 1.2, span: 1.4, lateral: 1.0, roll: 0.8, prop: 1.1,
   near: 0.9, camfwd: 1.0 }; // near/camfwd = 홍채 비율 기반(얼굴 트래킹 업그레이드) — head 1.6→0.7·pitch 0.5→0.25: 내려보기 오탐 완화
 const HEAD_DROP_DEADZONE = 0.25; // 기준 대비 25% 이상 내려가야 페널티(공부 중 책 보는 정도는 허용 — 0.15→0.25)
-const TILT_MARGIN_DEG = 3;       // 기준 + 3도 초과부터 페널티(더 타이트)
+const TILT_MARGIN_DEG = 4;       // 기준 +4° 초과부터 페널티 — 논문 교차근거: KIIT2026 비율±10%≈2~4°, JAICT2025≈8°의 교집합
 const TILT_FULL_DEG = 14;        // 14도 초과분에서 가중치 최대
 const PITCH_MARGIN_DEG = 35;     // 기준서 35도 이상 숙여야 페널티(화면·책 오가는 공부 허용 — 28→35)
 const PITCH_FULL_DEG = 48;       // 48도 초과분에서 가중치 최대(완만한 램프)
-const FORWARD_MARGIN = 0.10;     // 기준 대비 정규화 0.10 이상 '앞으로' 나와야 페널티(Z 노이즈 여유)
-const FORWARD_FULL = 0.30;       // +0.30 초과분에서 가중치 최대
+// 거북목 전방이동 임계 — KIIT2026(하호진) Dfhd 기준 정렬: 정상 경계 5.5cm≈0.145·어깨너비, 심각 8cm≈0.21.
+// margin 0.13(≈5cm)부터 감점 시작, +0.12 램프로 0.25(≈9.5cm=임상 '심각')에서 만감점.
+const FORWARD_MARGIN = 0.13;
+const FORWARD_FULL = 0.12;
 const SPAN_DEADZONE = 0.06;      // 어깨너비/귀간격(3D)이 기준보다 6% 이상 줄어야 페널티(말림)
 const SPAN_FULL = 0.15;          // 15% 축소분에서 가중치 최대
 const LATERAL_MARGIN = 0.12;     // 귀중점이 어깨중점서 어깨너비의 0.12 이상 좌/우로 벗어나야 페널티(양방향)

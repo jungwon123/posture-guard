@@ -13,7 +13,7 @@ export const TUNING = {
   WEIGHTS: { proximity: 0.5, pitch: 0.10, shoulder_roll: 0.40 },
   SCORE_K: 1.0,
   BAD_ENTER_SCORE: 60,
-  BAD_ENTER_SUSTAIN: 7.0,   // 5→7초: 잠깐 숙였다 드는 정도로는 잔소리 안 하게(지속적일 때만).
+  BAD_ENTER_SUSTAIN: 8.0,   // 7→8초(JAICT2025는 15초 단일알림 — 우리는 CAUTION 조기경고가 있어 중간값): 필기 오탐 완화.
   // 주의(CAUTION) 중간 단계 — 논문(JIIBC 2024)의 YELLOW에 해당. 생체역학 근거: 바른자세 목하중 ~5kg가
   // 두 배(~12kg)로 늘기 시작하는 각도대. GOOD↔BAD 사이 '부드러운 조기 경고'(알람·진동 없음, 요정 표정만).
   CAUTION_ENTER_SCORE: 73,     // 이 아래로 떨어지면(단, BAD는 아님) 주의
@@ -21,7 +21,7 @@ export const TUNING = {
   CAUTION_TO_BAD_SUSTAIN: 5.0, // 이미 주의 상태 → BAD로는 조금 빠르게(7→5)
   GOOD_ENTER_SCORE: 75,
   GOOD_ENTER_SUSTAIN: 3.0,
-  AWAY_AFTER: 10.0,
+  AWAY_AFTER: 15.0,  // 10→15초(JAICT2025 검증값): 물건 줍기 등 잠깐 가림이 자리비움으로 새는 오탐 감소.
   ESCALATE_NOTIFY: 20.0,
   ESCALATE_VIGNETTE: 60.0,
 };

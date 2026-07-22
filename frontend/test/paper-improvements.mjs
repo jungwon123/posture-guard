@@ -42,7 +42,7 @@ ok("GOOD→CAUTION (score70, 2.5s)", run([[70, 0], [70, 3]]) === "CAUTION");
 // GOOD, 잠깐(2.5s 미만)이면 아직 GOOD
 ok("GOOD 유지(2s만)", run([[70, 0], [70, 2]]) === "GOOD");
 // GOOD → 급락(50<60) 7s → BAD (주의 안 거치고)
-ok("GOOD→BAD (score50, 7s)", run([[50, 0], [50, 7.1]]) === "BAD");
+ok("GOOD→BAD (score50, 8s)", run([[50, 0], [50, 8.1]]) === "BAD");
 // GOOD → 급락 5s만이면 아직 GOOD (BAD sustain 7s)
 ok("GOOD 급락 5s는 아직 GOOD", run([[50, 0], [50, 5]]) === "GOOD");
 // CAUTION → 회복(80>=75) 3s → GOOD
@@ -50,13 +50,14 @@ ok("CAUTION→GOOD (score80, 3s)", run([[70, 0], [70, 3], [80, 3], [80, 6.1]]) =
 // CAUTION → 악화(50) 5s → BAD
 ok("CAUTION→BAD (score50, 5s)", run([[70, 0], [70, 3], [50, 3], [50, 8.1]]) === "BAD");
 // BAD → 부분회복(74, 73~75) 2.5s → CAUTION
-ok("BAD→CAUTION (score74, 2.5s)", run([[50, 0], [50, 7.1], [74, 8], [74, 11]]) === "CAUTION");
+ok("BAD→CAUTION (score74, 2.5s)", run([[50, 0], [50, 8.1], [74, 9], [74, 12]]) === "CAUTION");
 // BAD → 완전회복(80) 3s → GOOD
-ok("BAD→GOOD (score80, 3s)", run([[50, 0], [50, 7.1], [80, 8], [80, 11.1]]) === "GOOD");
+ok("BAD→GOOD (score80, 3s)", run([[50, 0], [50, 8.1], [80, 9], [80, 12.1]]) === "GOOD");
 // CAUTION에서 애매한 점수(70, 60~75)면 그대로 유지(튐 방지)
 ok("CAUTION 유지(score70)", run([[70, 0], [70, 3], [70, 6], [70, 20]]) === "CAUTION");
 // AWAY 복귀는 여전히 GOOD
-ok("null(사람없음) 10s → AWAY", run([[null, 0], [null, 10.1]]) === "AWAY");
+ok("null(사람없음) 15s → AWAY (JAICT2025 검증값)", run([[null, 0], [null, 15.1]]) === "AWAY");
+ok("null 12s는 아직 AWAY 아님", run([[80, 0], [80, 3], [null, 3], [null, 15]]) === "GOOD");
 
 console.log(`\n결과: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
