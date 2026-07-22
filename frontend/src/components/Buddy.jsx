@@ -57,6 +57,22 @@ const loadPin = () => { try { return JSON.parse(localStorage.getItem("pg_buddy_p
 
 export default function Buddy() {
   const [hidden, setHidden] = useState(() => localStorage.getItem("pg_buddy_off") === "1");
+  // 통계(리포트) 오버레이 열림 감지 — 요정·말풍선 함께 숨김 (QC2차 #19).
+  // CSS :has 규칙과 이중 안전장치: :has 미지원 브라우저(구형 삼성 인터넷 등)에서도 동작.
+  const [reportOpen, setReportOpen] = useState(false);
+  useEffect(() => {
+    const ro = document.getElementById("report-overlay");
+    if (!ro) return;
+    const sync = () => {
+      const open = ro.classList.contains("open");
+      setReportOpen(open);
+      if (open) document.querySelectorAll(".buddy-bubble-wrap").forEach((w) => { w.style.display = "none"; });
+    };
+    sync();
+    const mo = new MutationObserver(sync);
+    mo.observe(ro, { attributes: true, attributeFilter: ["class"] });
+    return () => mo.disconnect();
+  }, []);
   // 초기 위치: 사용자가 끌어다 둔 자리(pin)가 있으면 거기, 없으면 폰 컬럼 안 기본 자리
   const [pos, setPos] = useState(() => {
     const pin = loadPin();
@@ -117,7 +133,10 @@ export default function Buddy() {
       // 화면 하단에 고정해 두면 말풍선이 잘리므로 위쪽으로 뒤집기
       wrap.style.top = (cur.top + B + 12 + 40 > innerHeight ? cur.top - 40 : cur.top + B + 12) + "px";
     };
-    const showBubble = (t) => { bub.textContent = t; wrap.style.display = "block"; placeBubble(); };
+    const showBubble = (t) => {
+      if (document.getElementById("report-overlay")?.classList.contains("open")) return; // 통계 열람 중엔 말풍선 금지
+      bub.textContent = t; wrap.style.display = "block"; placeBubble();
+    };
     const hideBubble = () => { wrap.style.display = "none"; };
     wrap.__place = placeBubble; // 드래그 핸들러(이펙트 밖)가 말풍선을 따라오게 할 훅
     const setBoth = (p) => { const from = posRef.current; posRef.current = p; setPos(p); if (wrap.style.display !== "none") placeBubble(); R.current.lastMove = performance.now(); sparkleTrail(from, p); };
@@ -201,7 +220,7 @@ export default function Buddy() {
     localStorage.setItem("pg_buddy_pos", JSON.stringify(posRef.current));
   };
 
-  if (hidden) return null;
+  if (hidden || reportOpen) return null;
   return (
     <div className={`buddy${dragging ? " dragging" : ""}`} style={{ left: pos.left, top: pos.top }}
       onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp}>
