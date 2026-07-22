@@ -1191,3 +1191,11 @@ body:has(#report-overlay.open) .buddy-bubble-wrap { display: none !important; }
 #tune-foot button { flex: 1; padding: 6px 0; border-radius: 8px; border: 1px solid var(--line); background: transparent; color: var(--text); font-size: 12px; cursor: pointer; }
 #tune-foot button:hover { border-color: var(--accent); color: var(--accent); }
 #tune-panel.min #tune-body, #tune-panel.min #tune-foot { display: none; }
+
+/* 카메라 배치 모드 토글 (시작 화면) */
+.cam-mode { display: flex; gap: 6px; margin-top: 2px; }
+.cam-mode button {
+  padding: 6px 16px; border-radius: 999px; font-size: 12.5px; cursor: pointer;
+  border: 1px solid var(--line); background: transparent; color: var(--dim); transition: all .15s;
+}
+.cam-mode button.on { border-color: var(--accent); color: var(--accent); font-weight: 700; }

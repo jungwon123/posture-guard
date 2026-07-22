@@ -6,7 +6,8 @@ import {
 } from "./core.js";
 // 3D 절대 지표 레이어 — 개인 z-score 위에 "거리에 강한 + 절대 바른자세" 게이트를 얹는다(core 무수정).
 import { AbsSmoother, extractAbsolute, finishAbsRef, absPenalty, absDominant, headPoseFromMatrix,
-  extractGuidePoints, finishGuide, projectGuide, computeDrift, TUNE3D } from "./posture3d.js";
+  extractGuidePoints, finishGuide, projectGuide, computeDrift, TUNE3D,
+  extractSide, SideSmoother, finishSideRef, sidePenalty, sideDominant, TUNE_SIDE } from "./posture3d.js";
 import { Rewards, MELODIES, SKINS, SHOP, TIERS, computeReport, hurtMotion } from "./reward.js";
 import { getAuth, syncPull, mergeData, startSyncLoop, writeDailySnapshot, pushDaily, localDateStr, recalcTodaySnapshot } from "./sync.js";
 import { computeSubjects, readSubjLog, readSubjects, writeDailySubjSnapshot } from "./subjects.js";
@@ -112,6 +113,27 @@ let absRef = null;                   // 유도 캘리브로 잡은 "바른 자�
 let absCalibSamples = [];            // 캘리브 중 절대 지표 수집
 let lastAbs = null;                  // 최근 절대 지표(트래킹 수치 표시용)
 
+// ── 카메라 배치 모드 — front(기존) | side(베타) ──
+// 측면 = 폰을 책상 옆에 두는 배치. 거북목(귀-어깨 정렬)이 화면 X축에서 직접 보여 깊이 추정 불필요.
+// 시작 전(start-cta)에만 전환 가능. 기준은 모드별 별도(pg_side_ref). URL ?side=1/0으로도 전환.
+{
+  const q = new URLSearchParams(location.search).get("side");
+  if (q === "1") localStorage.setItem("pg_cam_mode", "side");
+  else if (q === "0") localStorage.setItem("pg_cam_mode", "front");
+}
+let camMode = localStorage.getItem("pg_cam_mode") === "side" ? "side" : "front";
+// 포즈 모델 티어 — 기본 full, ?model=lite 로 저사양 폴백 (모델은 최초 로드 시 1회 결정)
+{
+  const q = new URLSearchParams(location.search).get("model");
+  if (q === "lite" || q === "full") localStorage.setItem("pg_model", q);
+}
+const MODEL_TIER = localStorage.getItem("pg_model") === "lite" ? "lite" : "full";
+let sideRef = null; try { sideRef = JSON.parse(localStorage.getItem("pg_side_ref") || "null"); } catch {}
+let sideSmoother = new SideSmoother();
+let sideCalibSamples = [];
+let lastSide = null;
+const hasBaseline = () => (camMode === "side" ? !!(sideRef && Number.isFinite(sideRef.fhp)) : !!judge);
+
 // ── 슬로우 드리프트 감지 상태 — 수 분에 걸쳐 서서히 무너지는 자세(임계값 아래 잠행)를 잡는다 ──
 const DRIFT = {
   SAMPLE_GAP: 2,   // 2초마다 1샘플
@@ -157,6 +179,9 @@ const TUNE_KNOBS = [
   { obj: () => TUNING, key: "AWAY_AFTER",         label: "자리비움 판정(초)",  min: 5,    max: 30,   step: 1 },
   { obj: () => DRIFT,  key: "HV_DROP",            label: "드리프트: 가라앉음", min: 0.05, max: 0.25, step: 0.01 },
   { obj: () => DRIFT,  key: "FWD_RISE",           label: "드리프트: 전방",     min: 0.05, max: 0.25, step: 0.01 },
+  { obj: () => TUNE_SIDE, key: "FHP_MARGIN",        label: "측면: 거북목 시작",   min: 0.05, max: 0.4, step: 0.01 },
+  { obj: () => TUNE_SIDE, key: "NECK_MARGIN_DEG",   label: "측면: 목 기울기(°)",  min: 3,    max: 20,  step: 1 },
+  { obj: () => TUNE_SIDE, key: "SPITCH_MARGIN_DEG", label: "측면: 고개숙임(°)",   min: 15,   max: 50,  step: 1 },
 ];
 const tuneDefaults = {};
 TUNE_KNOBS.forEach((k) => { tuneDefaults[k.key] = k.obj()[k.key]; });
@@ -298,6 +323,7 @@ const FACE_HEAD_GAP = 180;     // 머리자세용 얼굴 추론 최소 간격(ms
 
 const profile = store.loadProfile();
 if (profile) { judge = new Judge(profile); sm.state = "GOOD"; absRef = profile.absRef || null; guideRef = profile.guide || null; camRef = profile.camFrame || null; }
+if (camMode === "side") sm.state = hasBaseline() ? "GOOD" : "UNCALIBRATED"; // 측면 모드는 측면 기준 기준으로 부팅
 
 // 카메라 프레이밍 지표(이미지 정규좌표) — 어깨너비·어깨중심Y. 자세보다 카메라 위치/거리 변화에 민감.
 function camFrameOf(lms) {
@@ -556,7 +582,8 @@ async function start() {
       landmarker = await PoseLandmarker.createFromOptions(vision, {
         baseOptions: {
           modelAssetPath:
-            "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
+            // full = lite와 같은 33포인트를 더 정확하게(측면 등 가림 많은 뷰에 특히 유리). 저사양 폴백: ?model=lite
+            `https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_${MODEL_TIER}/float16/1/pose_landmarker_${MODEL_TIER}.task`,
           delegate: "GPU",
         },
         runningMode: "VIDEO", numPoses: 1,
@@ -578,20 +605,22 @@ async function start() {
   els.btnStart.classList.add("danger"); // 공부 중엔 종료 버튼임을 색으로 분명히
   els.btnStart.disabled = false;
   els.btnCalib.disabled = false;
-  els.btnCalib.textContent = judge ? "기준 다시 잡기" : "바른자세 기준 등록 (5초)";
+  els.btnCalib.textContent = hasBaseline() ? "기준 다시 잡기" : (camMode === "side" ? "측면 기준 등록 (5초)" : "바른자세 기준 등록 (5초)");
   els.btnPip.disabled = false;
   updateOverlays(sm.state); // 시작 CTA 숨기고, 미등록이면 [기준 등록] 강조
   if (rewards.attend(dateStr())) {
-    els.msg.textContent = "출석 +10P! " + (judge ? "감지 중 (저장된 기준 사용)." : "평소 공부 자세로 앉은 뒤 [기준 등록]을 누르세요.");
+    els.msg.textContent = "출석 +10P! " + (hasBaseline() ? "감지 중 (저장된 기준 사용)." : camMode === "side" ? "폰을 옆에 두고 옆모습이 보이면 [기준 등록]을 누르세요." : "평소 공부 자세로 앉은 뒤 [기준 등록]을 누르세요.");
     flashPoints();
     rewardUntil = nowSec() + 3;
   } else {
-    els.msg.textContent = judge
+    els.msg.textContent = hasBaseline()
       ? "감지 중 (저장된 기준 사용). 기준을 다시 잡으려면 [기준 등록]."
-      : "평소 공부 자세로 앉은 뒤 [기준 등록]을 누르세요.";
+      : camMode === "side"
+        ? "폰을 옆에 두고 옆모습이 보이면 [기준 등록]을 누르세요."
+        : "평소 공부 자세로 앉은 뒤 [기준 등록]을 누르세요.";
   }
-  if (judge) logTransition(null, sm.state, nowSec());
-  ensureFaceModel(); // 머리자세 판정(+눈 깜빡임)용 얼굴 모델 프리로드 — 캘리브 전에 준비되도록
+  if (hasBaseline()) logTransition(null, sm.state, nowSec());
+  if (camMode !== "side") ensureFaceModel(); // 얼굴 모델(머리자세·홍채·깜빡임)은 정면 전용 — 측면에선 스킵(배터리 절약)
   // PiP 폴백용 스트림 예열 — 클릭 시 await 없이 바로 요청해 user activation 소진을 막는다
   drawMini(sm.state, null, rewards.fairy(sm.state, 0, false), false, nowSec());
   if (!els.miniVideo.srcObject) els.miniVideo.srcObject = els.miniCanvas.captureStream(2);
@@ -730,6 +759,7 @@ async function ensureFaceModel() {
 // blink 샘플 창에서는 매 프레임, 그 외엔 머리자세용으로만 ~5.5Hz 스로틀(폰 부담 완화). 결과=lastFaceFr.
 function runFace(now, wallMs) {
   lastFaceFr = null;
+  if (camMode === "side") return; // 측면에선 얼굴 랜드마크(정면 전용)를 쓰지 않음
   if (!faceLandmarker) return;
   const sampling = blinkEnabled && blinkSampling && calibUntil === null; // blink 창은 풀레이트
   const dueHead = wallMs - lastFaceDetect >= FACE_HEAD_GAP;              // 머리자세는 스로틀
@@ -803,7 +833,7 @@ function updateOverlays(state) {
   show(els.calibGuide, calibrating);                               // 등록 중 — 자세 안내 + 카운트다운
   show(els.awayNotice, running && !calibrating && state === "AWAY"); // 자리 비움 — 측정 멈춤 안내
   // 등록 전 다음 할 일 강조 — 아직 기준이 없으면 [기준 등록] 버튼을 맥동시켜 시선을 끈다
-  els.btnCalib.classList.toggle("pulse", running && !calibrating && !judge);
+  els.btnCalib.classList.toggle("pulse", running && !calibrating && !hasBaseline());
 }
 
 // 중앙 팝업 — 등록 완료·측정 종료 등 놓치면 안 되는 안내를 화면 중앙에 크게 (2~3초)
@@ -842,7 +872,7 @@ function tick() {
     }
     lastActiveSec = now;
     if (now - lastActivePersist > 3) { try { localStorage.setItem("pg_last_active", String(Math.round(now))); } catch {} lastActivePersist = now; }
-    let sig = null, absM = null, guideSample = null, camSample = null;
+    let sig = null, absM = null, guideSample = null, camSample = null, sideM = null;
     lastFaceFr = null; // pose detect가 throw해도 blink가 이전 틱 프레임을 재소비하지 않도록
     try {
       lastResult = landmarker.detectForVideo(els.cam, wallMs);
@@ -852,6 +882,10 @@ function tick() {
         if (raw) sig = smoother.update(raw);
         guideSample = extractGuidePoints(lms); // 트래킹 가이드 캡처용(어깨프레임 머리위치)
         camSample = camFrameOf(lms);           // 카메라 이동 감지 기준(어깨너비·중심Y)
+        if (camMode === "side") {              // 측면 지표(가까운 귀·어깨·코 3점)
+          const rs = extractSide(lms);
+          if (rs) { sideM = sideSmoother.update(rs, now); lastSide = sideM; }
+        }
       }
       runFace(now, wallMs); // 얼굴 추론 1회(머리자세 + blink 공유) → faceHead 갱신
       // 3D 절대 지표(미터 world 좌표, 추가 추론비용 0) + 얼굴 머리 pitch(있으면). 없으면 null
@@ -872,14 +906,38 @@ function tick() {
     if (calibUntil !== null) {
       if (sig) calibSamples.push(sig);
       if (absM) absCalibSamples.push(absM);
+      if (sideM) sideCalibSamples.push(sideM);
       if (guideSample) guideCalibSamples.push(guideSample);
       if (camSample) camCalibSamples.push(camSample);
       const remain = calibUntil - now;
       els.calibCount.textContent = String(Math.max(0, Math.ceil(remain))); // 큰 카운트다운(오버레이)
       els.msg.textContent = `공부 바른자세 기준 등록 중… ${Math.max(0, remain).toFixed(1)}초. 평소 공부하는 자세로 등과 목만 곧게`;
       if (remain <= 0) {
-        const wasRegistered = !!judge; // 재등록 여부 — 완료 문구 구분
-        if (calibSamples.length >= 5) {
+        const wasRegistered = hasBaseline(); // 재등록 여부 — 완료 문구 구분
+        if (camMode === "side") {
+          // ── 측면 모드: 측면 3점 기준만 등록 (정면 프로필과 독립) ──
+          const sref = finishSideRef(sideCalibSamples);
+          if (sref) {
+            sideRef = sref;
+            try { localStorage.setItem("pg_side_ref", JSON.stringify(sref)); } catch {}
+            sideSmoother = new SideSmoother();
+            resetDrift();
+            sm = new StateMachine(); sm.state = "GOOD";
+            escStep = 0; praiseUntil = 0; rewardUntil = 0; camMoveHits = 0;
+            encourageUntil = 0; nextEncourageAt = 0; hurtLatch = null; hurtLatchWorst = null;
+            logTransition(null, "GOOD", now);
+            els.btnCalib.textContent = "기준 다시 잡기";
+            els.btnCalib.classList.remove("pulse");
+            els.msg.textContent = "측면 기준 등록 완료. 옆에서 지켜볼게요!";
+            centerPop(wasRegistered
+              ? `<div class="cp-title">새 측면 기준으로 다시 시작해요</div><div class="cp-sub">이전 경고는 초기화했어요 · 기록 시간은 그대로예요</div>`
+              : `<div class="cp-title">측면 기준 등록 완료!</div><div class="cp-sub">귀-어깨 정렬로 거북목을 직접 봐요.<br>폰 위치가 바뀌면 [기준 다시 잡기]</div>`, 3000);
+            speak(wasRegistered ? "새 기준으로 시작해요" : "준비 완료, 옆에서 지켜볼게요");
+          } else {
+            els.msg.textContent = "옆모습이 잘 안 잡혔어요. 귀와 어깨가 보이게 폰 위치를 맞춰주세요.";
+            centerPop(`<div class="cp-title">등록에 실패했어요</div><div class="cp-sub">폰을 책상 옆에 두고,<br>화면에 귀·어깨 옆모습이 보이게 해주세요</div>`, 2600);
+          }
+        } else if (calibSamples.length >= 5) {
           const p = finishCalibration(calibSamples);
           const ref = finishAbsRef(absCalibSamples); // 이 "바른 자세"의 3D 절대 기준
           if (ref) p.absRef = ref;
@@ -915,17 +973,23 @@ function tick() {
         absCalibSamples = [];
         guideCalibSamples = [];
         camCalibSamples = [];
+        sideCalibSamples = [];
       }
     }
 
     // 판정 + 상태 전이 — 개인 z-score(core)에 3D 절대 게이트를 곱해 결합
     let score = null, zs = {};
-    if (judge && sig && calibUntil === null) {
-      [score, zs] = judge.score(sig);
-      if (absRef && absM) score *= Math.exp(-absPenalty(absM, absRef)); // 절대적으로 나쁘면 추가 감점
+    if (calibUntil === null) {
+      if (camMode === "side") {
+        // 측면: 3점 기하(귀-어깨 정렬·목 각도·고개 숙임)만으로 판정 — 깊이 추정 불필요
+        if (sideRef && sideM) score = 100 * Math.exp(-sidePenalty(sideM, sideRef));
+      } else if (judge && sig) {
+        [score, zs] = judge.score(sig);
+        if (absRef && absM) score *= Math.exp(-absPenalty(absM, absRef)); // 절대적으로 나쁘면 추가 감점
+      }
     }
     const prev = sm.state;
-    const state = sm.update(judge ? score : null, now);
+    const state = sm.update(hasBaseline() ? score : null, now);
     const dur = sm.stateSince ? now - sm.stateSince : 0;
     const badCand = sm.cand?.[0] === "BAD";
     const face = rewards.fairy(state, dur, badCand);
@@ -939,7 +1003,10 @@ function tick() {
       const c = TUNING.WEIGHTS[k] * Math.max(0, zs[k] - TUNING.DEADZONE_Z);
       if (c > worstC) { worstC = c; worst = k; }
     }
-    if (absRef && absM) {
+    if (camMode === "side") {
+      const d = sideRef && sideM ? sideDominant(sideM, sideRef) : null;
+      if (d && d.c > worstC) { worstC = d.c; worst = d.key; } // fhp·neck→head_drop(거북목 멘트) 재사용
+    } else if (absRef && absM) {
       const d = absDominant(absM, absRef);
       if (d && d.c > worstC) { worstC = d.c; worst = d.key; }
     }
@@ -963,6 +1030,9 @@ function tick() {
       pitch: faceHead ? Math.round(faceHead.pitch) : null, // 실기기 부호 확인·디버그용
       absOn: !!(absRef && absM),                            // 절대 게이트(어깨기울기·거북목·머리각) 작동 여부
       drift: lastDrift,                                     // 슬로우 드리프트 {hv, fwd} — ?fwd=1 디버그·실기기 튜닝용
+      mode: camMode,                                        // front | side
+      sfhp: camMode === "side" && lastSide?.fhp != null ? +lastSide.fhp.toFixed(3) : null,   // 측면 귀 전방 이동
+      sneck: camMode === "side" && lastSide?.neckAngle != null ? +lastSide.neckAngle.toFixed(1) : null, // 측면 목 각도
       absPen: (absRef && absM) ? +absPenalty(absM, absRef).toFixed(2) : null, // 총 절대 페널티
       // 전방머리(거북목)
       fwd: absM?.headForward != null ? +absM.headForward.toFixed(3) : null,
@@ -1817,10 +1887,43 @@ els.btnCalib.onclick = () => {
   if (!running) return;
   calibUntil = nowSec() + TUNING.CALIB_SECS;
   calibSamples = []; absCalibSamples = []; guideCalibSamples = []; camCalibSamples = []; absSmoother = new AbsSmoother();
+  sideCalibSamples = []; sideSmoother = new SideSmoother();
   els.calibCount.textContent = String(TUNING.CALIB_SECS);
+  // 모드별 등록 안내 문구 (calib-guide 오버레이)
+  const instr = document.querySelector("#calib-guide .calib-instr");
+  const sub = document.querySelector("#calib-guide .calib-sub");
+  if (camMode === "side") {
+    if (instr) instr.textContent = "폰을 옆에 두고, 옆모습으로 바르게 앉아 주세요";
+    if (sub) sub.textContent = "귀와 어깨가 화면에 보이게. 이게 '내 측면 기준'이 돼요";
+  } else {
+    if (instr) instr.textContent = "평소 공부하는 자세로 앉아 주세요";
+    if (sub) sub.textContent = "등과 목만 곧게. 이게 '내 공부 바른자세' 기준이 돼요";
+  }
   updateOverlays(sm.state); // 등록 안내 오버레이 즉시 표시
-  speak("평소 공부 자세로, 등과 목만 곧게 펴요");
+  speak(camMode === "side" ? "옆모습으로 바르게 앉아요" : "평소 공부 자세로, 등과 목만 곧게 펴요");
 };
+
+// ── 카메라 모드 토글 (시작 화면에서만 — 측정 중엔 start-cta가 숨어 전환 불가) ──
+function setCamMode(mode) {
+  if (mode === camMode) return;
+  camMode = mode;
+  localStorage.setItem("pg_cam_mode", mode);
+  document.getElementById("mode-front")?.classList.toggle("on", mode === "front");
+  document.getElementById("mode-side")?.classList.toggle("on", mode === "side");
+  sideSmoother = new SideSmoother(); smoother = new SignalSmoother(); absSmoother = new AbsSmoother();
+  resetDrift(); lastSide = null;
+  sm = new StateMachine(); sm.state = hasBaseline() ? "GOOD" : "UNCALIBRATED";
+  els.btnCalib.textContent = hasBaseline() ? "기준 다시 잡기" : (mode === "side" ? "측면 기준 등록 (5초)" : "바른자세 기준 등록 (5초)");
+  els.msg.textContent = mode === "side"
+    ? "측면 모드(베타): 폰을 책상 옆에 두고 시작하세요. 귀-어깨 정렬로 거북목을 직접 봐요."
+    : "정면 모드로 전환했어요.";
+}
+document.getElementById("mode-front")?.addEventListener("click", () => setCamMode("front"));
+document.getElementById("mode-side")?.addEventListener("click", () => setCamMode("side"));
+if (camMode === "side") {
+  document.getElementById("mode-side")?.classList.add("on");
+  document.getElementById("mode-front")?.classList.remove("on");
+}
 els.btnNotify.onclick = async () => {
   playNotes(MELODIES.sparkle.notes, rewards.settings.volume); // 사용자 제스처로 오디오 잠금 해제 (아이폰 필수 — 가장 먼저)
   if (typeof Notification === "undefined") {

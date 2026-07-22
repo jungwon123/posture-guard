@@ -16,6 +16,11 @@ export default function MainPanels() {
         <div id="start-cta">
           <div className="start-cta-desc">요정이 지켜보는 공부방, 시작할까요?</div>
           <button id="btn-start-hero" className="primary">공부 시작</button>
+          {/* 카메라 배치 — 정면(인강·화면 공부) / 측면(책 공부, 폰을 옆에) */}
+          <div className="cam-mode" id="cam-mode">
+            <button id="mode-front" type="button" className="on">정면</button>
+            <button id="mode-side" type="button">측면 베타</button>
+          </div>
           <div className="start-cta-sub">영상은 저장되지 않고 자세만 살펴봐요</div>
         </div>
 
