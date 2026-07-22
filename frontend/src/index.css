@@ -1025,11 +1025,11 @@
 .page-title::before { content: ""; width: 20px; height: 13px; flex: none;
   background: url("/assets/ui/ui-sprout.png") center / contain no-repeat; }
 /* 카드: 우상단 잎 장식 (상단에 조작 요소가 있는 카드는 제외)
-   줄기 밑동(잘린 끝)이 모서리 '밖'으로 살짝 빠져나가야 가지가 카드에서 자라는 것처럼 붙어 보인다 —
-   안쪽에 띄우면 잘린 줄기가 허공에 뜬다(study-hero::after와 같은 오버행 처리). */
+   줄기 밑동(잘린 끝)이 모서리에 딱 닿아야 가지가 카드에서 자라는 것처럼 보인다 —
+   안쪽에 띄우면 허공에 뜨고, 밖으로 밀면(-오버행) 카드 위로 삐져나간다. 플러시(1px)가 정답. */
 .card { position: relative; }
 .card:not(.dressup-head):not(.cal-card):not(.chart-card):not(.account-card)::after {
-  content: ""; position: absolute; top: -7px; right: -7px; width: 52px; height: 48px;
+  content: ""; position: absolute; top: 1px; right: 1px; width: 52px; height: 48px;
   background: url("/assets/ui/ui-corner-leaf.png") center / contain no-repeat;
   transform: rotate(180deg); opacity: .14; pointer-events: none;
 }
