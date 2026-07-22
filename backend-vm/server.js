@@ -99,7 +99,6 @@ const CORS_ALLOW = [
   /^https:\/\/posture-guard-[a-z0-9]+-jungwons-projects-[a-z0-9]+\.vercel\.app$/, // 배포/프리뷰 URL(팀 스코프)
   /^http:\/\/localhost:\d+$/,                                                // 로컬 개발
 ];
-app.set("trust proxy", 1); // nginx 뒤에서 X-Forwarded-For의 실제 클라이언트 IP로 rate limit
 app.use(cors({
   origin: (origin, cb) => {
     if (!origin) return cb(null, true); // 서버-서버·curl(Origin 없음) 허용

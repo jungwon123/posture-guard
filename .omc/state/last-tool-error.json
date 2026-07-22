@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"cd /Users/jwon/Downloads/turtle/frontend && node test/subjects.mjs && node test/iris-upgrade.mjs 2>&1 | tail -1 && node test/study-tuning.mjs 2>&1 | tail -1 && node test/paper-improvements...",
-  "error": "Exit code 1\n— 기본 머지 (착석 × 과목 교집합)\n  ✓ 수학 watched=150 (GOOD 0-100 + GOOD 150-200, AWAY 자동 제외)\n  ✓ 수학 good=150\n  ✓ 국어 watched=80 (GOOD 200-250 + BAD 250-280)\n  ✓ 국어 good=50 (BAD 구간은 good 제외)\n  ✓ 해제 후 _none watched=20 (BAD 280-300)\n— 창 경계·초기 상태\n  ✓ 창 중간 진입: 수학 30 (170-200)\n  ✓ 창 중간 진입: 국어 20 (200-220)\n— 빈 입력 무해성\n  ✗ 과목 로그 없음 → 전부 _none\n  ✓ 이벤트 없음 → 빈 결과\n결과: 8 passed, 1 failed",
-  "timestamp": "2026-07-22T04:13:58.379Z",
+  "tool_input_preview": "{\"command\":\"gcloud compute ssh pg-api-vm --zone asia-northeast3-a --command \\\"sudo -u postgres pg_dump --no-owner --no-privileges posture > ~/pg-backup-\\\\$(date +%F).sql && ls -la ~/pg-backup-*.sql &&...",
+  "error": "Exit code 1\n-rw-r--r-- 1 jwon jwon 33145 Jul 22 16:20 /home/jwon/pg-backup-2026-07-22.sql\n--\n-- PostgreSQL database dump\n--\n/usr/bin/scp: open local \"/Users/jwon/Downloads/turtle-db-backups/\": No such file or directory\r\nERROR: (gcloud.compute.scp) [/usr/bin/scp] exited with return code [1].\nls: /Users/jwon/Downloads/turtle-db-backups/: No such file or directory",
+  "timestamp": "2026-07-22T16:20:21.699Z",
   "retry_count": 1
 }

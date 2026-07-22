@@ -40,7 +40,7 @@ docker compose down                      # 데이터까지 지우려면 -v
      --email <이메일> --agree-tos --no-eff-email
    ```
 7. **스택 기동**: `docker compose --profile vm up -d --build`
-8. **데이터 복원**: `docker compose exec -T db psql -U pg pg < ~/pg-backup-*.sql` 후 `sudo systemctl disable --now postgresql`.
+8. **데이터 복원**: `docker compose exec -T db psql -U pguser posture < ~/pg-backup-*.sql` 후 `sudo systemctl disable --now postgresql`.
 9. **검증**:
    - `curl -s https://34-64-158-222.sslip.io/api/health` → `{"ok":true}`
    - `docker compose exec redis redis-cli keys 'presence:*'` (프론트 접속 후 키 생성 확인)
