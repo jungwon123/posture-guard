@@ -1,3 +1,0 @@
-mediapipe==0.10.14  # 0.10.30대에서 legacy solutions API 제거됨 — 업그레이드 시 Tasks API 마이그레이션 필요
-opencv-python>=4.8
-numpy

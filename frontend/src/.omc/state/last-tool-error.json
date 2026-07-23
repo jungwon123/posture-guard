@@ -1,7 +1,0 @@
-{
-  "tool_name": "mcp__Claude_Browser__computer",
-  "tool_input_preview": "{\"action\":\"scroll\",\"coordinate\":[187,600],\"scroll_direction\":\"down\",\"scroll_amount\":6,\"tabId\":\"seed\"}",
-  "error": "computer timed out after 30s. The Browser pane may be stuck (modal dialog, navigation hang, or unresponsive renderer). Check preview_console_logs for errors.",
-  "timestamp": "2026-07-19T17:17:18.197Z",
-  "retry_count": 1
-}

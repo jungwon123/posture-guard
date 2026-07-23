@@ -1,7 +1,0 @@
-{
-  "tool_name": "mcp__Claude_Browser__javascript_tool",
-  "tool_input_preview": "{\"action\":\"javascript_exec\",\"tabId\":\"seed\",\"text\":\"\\n// 상점 탭 열기 → 구매 버튼 라벨 확인\\nconst shopTab = [...document.querySelectorAll(\\\"button\\\")].find(b => b.textContent.trim() === \\\"상점\\\");\\nif (shopTab) shop...",
-  "error": "javascript_tool failed: SyntaxError: await is only valid in async functions and the top level bodies of modules",
-  "timestamp": "2026-07-22T14:27:14.472Z",
-  "retry_count": 1
-}

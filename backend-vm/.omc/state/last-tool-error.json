@@ -1,7 +1,0 @@
-{
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"cd /Users/jwon/Downloads/turtle/infra && docker compose ps --format \\\"{{.Service}}: {{.Status}}\\\" && curl -s localhost:8080/api/health && echo && docker compose logs api 2>&1 | grep -iE \\\"...",
-  "error": "Exit code 7",
-  "timestamp": "2026-07-22T16:13:02.267Z",
-  "retry_count": 1
-}

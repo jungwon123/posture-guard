@@ -9,3 +9,28 @@ backend-vm/node_modules/
 infra/.env
 infra-lk/.env
 .venv/
+
+# AI 도구 상태 파일 — 리포에 커밋 금지
+.omc/
+**/.omc/
+.claude/
+**/.claude/
+.agents/
+skills-lock.json
+CLAUDE.md
+HARNESS.md
+
+# 파이썬 프로토타입 잔재 (로컬 보관용)
+__pycache__/
+*.pyc
+posture.db
+posture_guard.py
+posture_profile.json
+posture_rec_*.json
+requirements.txt
+run.command
+
+# 구버전·중간산물 (로컬 보관용)
+web/
+backend/
+nav-icon-src/

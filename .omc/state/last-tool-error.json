@@ -1,7 +1,0 @@
-{
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"tail -6 /private/tmp/claude-501/-Users-jwon-zanchi123/d8daac5f-58e7-4eef-9a14-2100edd17c1f/tasks/b1bb7qb9y.output; echo ===; head -4 /Users/jwon/Downloads/turtle/frontend/test/paper-improv...",
-  "error": "Exit code 1\n! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/\nVM 컨테이너 재배포: .github#2\n\nX Process completed with exit code 12.\nVM 컨테이너 재배포: .github#8\n\n(eval):1: == not found",
-  "timestamp": "2026-07-22T18:38:05.210Z",
-  "retry_count": 1
-}
